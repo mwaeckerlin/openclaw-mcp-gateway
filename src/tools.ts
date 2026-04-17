@@ -1,4 +1,4 @@
-import { ALLOWED_COMMANDS, AllowedToolName } from "./commands.js";
+import { ALLOWED_GATEWAY_REQUESTS, AllowedToolName } from "./commands.js";
 
 export interface ToolDefinition {
   name: AllowedToolName;
@@ -13,7 +13,7 @@ export interface ToolDefinition {
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "openclaw_status",
-    description: ALLOWED_COMMANDS.openclaw_status.description,
+    description: ALLOWED_GATEWAY_REQUESTS.openclaw_status.description,
     inputSchema: {
       type: "object",
       properties: {},
@@ -22,7 +22,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "openclaw_gateway_status",
-    description: ALLOWED_COMMANDS.openclaw_gateway_status.description,
+    description: ALLOWED_GATEWAY_REQUESTS.openclaw_gateway_status.description,
     inputSchema: {
       type: "object",
       properties: {},
@@ -31,7 +31,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "openclaw_logs",
-    description: ALLOWED_COMMANDS.openclaw_logs.description,
+    description: ALLOWED_GATEWAY_REQUESTS.openclaw_logs.description,
     inputSchema: {
       type: "object",
       properties: {},

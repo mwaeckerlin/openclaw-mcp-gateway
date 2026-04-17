@@ -1,36 +1,91 @@
+import { readFileSync } from "node:fs";
+
 export type AllowedToolName =
   | "openclaw_status"
   | "openclaw_gateway_status"
   | "openclaw_logs";
 
-export interface AllowedCommand {
-  binary: string;
-  args: string[];
+export interface AllowedGatewayRequest {
+  method: "GET";
+  path: string;
   timeoutMs: number;
   description: string;
+  notSupportedOn404?: boolean;
 }
 
-export const ALLOWED_COMMANDS: Record<AllowedToolName, AllowedCommand> = {
+export interface GatewayConfig {
+  baseUrl: string;
+  key: string;
+}
+
+export const ALLOWED_GATEWAY_REQUESTS: Record<AllowedToolName, AllowedGatewayRequest> = {
   openclaw_status: {
-    binary: "openclaw",
-    args: ["status"],
+    method: "GET",
+    path: "/api/v1/status",
     timeoutMs: 12_000,
-    description: "Return overall OpenClaw status."
+    description: "Return overall OpenClaw status from the Gateway API."
   },
   openclaw_gateway_status: {
-    binary: "openclaw",
-    args: ["gateway", "status"],
+    method: "GET",
+    path: "/api/v1/gateway/status",
     timeoutMs: 12_000,
-    description: "Return OpenClaw gateway status."
+    description: "Return OpenClaw gateway status from the Gateway API."
   },
   openclaw_logs: {
-    binary: "openclaw",
-    args: ["logs", "--tail", "200"],
+    method: "GET",
+    path: "/api/v1/logs?tail=200",
     timeoutMs: 18_000,
-    description: "Return last 200 lines of OpenClaw logs."
+    description: "Return the latest OpenClaw logs from the Gateway API.",
+    notSupportedOn404: true
   }
 };
 
 export function isAllowedToolName(value: string): value is AllowedToolName {
-  return Object.hasOwn(ALLOWED_COMMANDS, value);
+  return Object.hasOwn(ALLOWED_GATEWAY_REQUESTS, value);
+}
+
+function normalizeUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    throw new Error("OPENCLAW_GATEWAY_URL is empty");
+  }
+
+  const normalized = trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
+  const parsed = new URL(normalized);
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("OPENCLAW_GATEWAY_URL must use http or https");
+  }
+
+  return parsed.toString();
+}
+
+function readGatewayKey(): string {
+  const inlineKey = process.env.OPENCLAW_GATEWAY_KEY?.trim();
+  if (inlineKey) {
+    return inlineKey;
+  }
+
+  const keyFile = process.env.OPENCLAW_GATEWAY_KEY_FILE?.trim();
+  if (keyFile) {
+    const fileValue = readFileSync(keyFile, "utf8").trim();
+    if (fileValue) {
+      return fileValue;
+    }
+    throw new Error("OPENCLAW_GATEWAY_KEY_FILE is empty");
+  }
+
+  throw new Error("Set OPENCLAW_GATEWAY_KEY or OPENCLAW_GATEWAY_KEY_FILE");
+}
+
+export function loadGatewayConfig(): GatewayConfig {
+  const baseUrlEnv = process.env.OPENCLAW_GATEWAY_URL;
+  if (!baseUrlEnv) {
+    throw new Error("OPENCLAW_GATEWAY_URL is required");
+  }
+
+  return {
+    baseUrl: normalizeUrl(baseUrlEnv),
+    key: readGatewayKey()
+  };
 }

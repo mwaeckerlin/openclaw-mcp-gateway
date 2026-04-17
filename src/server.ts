@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -7,57 +6,104 @@ import {
   ListToolsRequestSchema,
   McpError
 } from "@modelcontextprotocol/sdk/types.js";
-import { ALLOWED_COMMANDS, isAllowedToolName } from "./commands.js";
+import {
+  ALLOWED_GATEWAY_REQUESTS,
+  GatewayConfig,
+  isAllowedToolName,
+  loadGatewayConfig
+} from "./commands.js";
 import { TOOL_DEFINITIONS } from "./tools.js";
 
-function runAllowedCommand(toolName: string): Promise<string> {
+function normalizeResponseBody(response: Response, bodyText: string): string {
+  const trimmed = bodyText.trim();
+  if (!trimmed) {
+    return "(no output)";
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.stringify(JSON.parse(trimmed), null, 2);
+    } catch {
+      return trimmed;
+    }
+  }
+
+  return bodyText.trimEnd();
+}
+
+function formatErrorBody(bodyText: string): string {
+  const trimmed = bodyText.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const maxLength = 500;
+  return trimmed.length <= maxLength ? trimmed : `${trimmed.slice(0, maxLength)}...`;
+}
+
+async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): Promise<string> {
   if (!isAllowedToolName(toolName)) {
     throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
   }
 
-  const command = ALLOWED_COMMANDS[toolName];
+  const requestSpec = ALLOWED_GATEWAY_REQUESTS[toolName];
+  const url = new URL(requestSpec.path, gatewayConfig.baseUrl);
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), requestSpec.timeoutMs);
 
-  return new Promise((resolve, reject) => {
-    execFile(
-      command.binary,
-      command.args,
-      {
-        timeout: command.timeoutMs,
-        maxBuffer: 1024 * 1024,
-        windowsHide: true
+  try {
+    const response = await fetch(url, {
+      method: requestSpec.method,
+      headers: {
+        Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+        Authorization: `Bearer ${gatewayConfig.key}`,
+        "X-API-Key": gatewayConfig.key
       },
-      (error, stdout, stderr) => {
-        if (!error) {
-          resolve((stdout ?? "").trimEnd());
-          return;
-        }
+      signal: abortController.signal
+    });
 
-        const normalizedStderr = (stderr ?? "").trim();
-        const err = error as NodeJS.ErrnoException & {
-          code?: number | string;
-          signal?: NodeJS.Signals;
-          killed?: boolean;
-        };
+    const responseText = await response.text();
 
-        if (err.code === "ENOENT") {
-          reject(new McpError(ErrorCode.InternalError, "openclaw binary not found"));
-          return;
-        }
-
-        if (err.killed || err.signal === "SIGTERM") {
-          reject(new McpError(ErrorCode.InternalError, `Command timed out after ${command.timeoutMs}ms`));
-          return;
-        }
-
-        const code = typeof err.code === "number" ? err.code : "unknown";
-        const details = normalizedStderr ? `: ${normalizedStderr}` : "";
-        reject(new McpError(ErrorCode.InternalError, `Command failed (exit ${code})${details}`));
+    if (!response.ok) {
+      if (response.status === 404 && requestSpec.notSupportedOn404) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          `${toolName} is not supported by the current Gateway API`
+        );
       }
-    );
-  });
+
+      const details = formatErrorBody(responseText);
+      const suffix = details ? `: ${details}` : "";
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Gateway request failed (${response.status} ${response.statusText})${suffix}`
+      );
+    }
+
+    return normalizeResponseBody(response, responseText);
+  } catch (error: unknown) {
+    if (error instanceof McpError) {
+      throw error;
+    }
+
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Gateway request timed out after ${requestSpec.timeoutMs}ms`
+      );
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new McpError(ErrorCode.InternalError, `Gateway request failed: ${message}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function main(): Promise<void> {
+  const gatewayConfig = loadGatewayConfig();
+
   const server = new Server(
     {
       name: "openclaw-mcp-gateway",
@@ -81,13 +127,13 @@ async function main(): Promise<void> {
       throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
     }
 
-    const output = await runAllowedCommand(toolName);
+    const output = await runAllowedTool(toolName, gatewayConfig);
 
     return {
       content: [
         {
           type: "text",
-          text: output || "(no output)"
+          text: output
         }
       ]
     };

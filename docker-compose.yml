@@ -4,6 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     image: openclaw-mcp-gateway:local
+    environment:
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL}
+      OPENCLAW_GATEWAY_KEY: ${OPENCLAW_GATEWAY_KEY:-}
+      OPENCLAW_GATEWAY_KEY_FILE: ${OPENCLAW_GATEWAY_KEY_FILE:-}
     stdin_open: true
     tty: true
     restart: unless-stopped

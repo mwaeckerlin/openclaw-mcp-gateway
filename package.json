@@ -1,7 +1,7 @@
 {
   "name": "openclaw-mcp-gateway",
   "version": "1.0.0",
-  "description": "MCP server to give SSH-sandboxed AI agents limited access to the OpenClaw CLI.",
+  "description": "MCP server to give SSH-sandboxed AI agents limited access to the OpenClaw Gateway API.",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
