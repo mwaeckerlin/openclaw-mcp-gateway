@@ -13,6 +13,7 @@ import {
   loadGatewayConfig
 } from "./commands.js";
 import { TOOL_DEFINITIONS } from "./tools.js";
+import { pathToFileURL } from "node:url";
 
 function normalizeResponseBody(response: Response, bodyText: string): string {
   const trimmed = bodyText.trim();
@@ -87,7 +88,7 @@ function isGatewayCapabilityError(status: number, details: string): boolean {
   return messageSuggestsNotSupported(details);
 }
 
-async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): Promise<string> {
+export async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): Promise<string> {
   if (!isAllowedToolName(toolName)) {
     throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
   }
@@ -171,7 +172,7 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
   }
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const gatewayConfig = loadGatewayConfig();
 
   const server = new Server(
@@ -214,8 +215,13 @@ async function main(): Promise<void> {
   console.error("OpenClaw MCP Gateway started over stdio");
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`Failed to start server: ${message}`);
-  process.exit(1);
-});
+const entryPoint = process.argv[1];
+const isDirectRun = typeof entryPoint === "string" && pathToFileURL(entryPoint).href === import.meta.url;
+
+if (isDirectRun) {
+  main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to start server: ${message}`);
+    process.exit(1);
+  });
+}
