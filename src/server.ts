@@ -1,5 +1,5 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -13,6 +13,7 @@ import {
   loadGatewayConfig
 } from "./commands.js";
 import { TOOL_DEFINITIONS } from "./tools.js";
+import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
 
 function normalizeResponseBody(response: Response, bodyText: string): string {
@@ -165,9 +166,7 @@ export async function runAllowedTool(toolName: string, gatewayConfig: GatewayCon
   }
 }
 
-export async function main(): Promise<void> {
-  const gatewayConfig = loadGatewayConfig();
-
+function createMcpServer(gatewayConfig: GatewayConfig): Server {
   const server = new Server(
     {
       name: "openclaw-mcp-gateway",
@@ -203,9 +202,88 @@ export async function main(): Promise<void> {
     };
   });
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("OpenClaw MCP Gateway started over stdio");
+  return server;
+}
+
+function getMcpListenPort(): number {
+  const rawPort = process.env.OPENCLAW_MCP_PORT?.trim();
+  if (!rawPort) {
+    return 3000;
+  }
+
+  const parsed = Number.parseInt(rawPort, 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65_535) {
+    throw new Error("OPENCLAW_MCP_PORT must be an integer between 1 and 65535");
+  }
+
+  return parsed;
+}
+
+function getMcpListenHost(): string {
+  return process.env.OPENCLAW_MCP_HOST?.trim() || "0.0.0.0";
+}
+
+function respondJson(res: ServerResponse, statusCode: number, body: Record<string, unknown>): void {
+  res.writeHead(statusCode, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
+async function handleMcpHttpRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  gatewayConfig: GatewayConfig
+): Promise<void> {
+  const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+
+  if (requestUrl.pathname === "/healthz" && req.method === "GET") {
+    respondJson(res, 200, { ok: true, status: "ready" });
+    return;
+  }
+
+  if (requestUrl.pathname !== "/mcp") {
+    respondJson(res, 404, { error: "not_found", message: "Unknown endpoint" });
+    return;
+  }
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined
+  });
+  const server = createMcpServer(gatewayConfig);
+
+  try {
+    await server.connect(transport);
+    await transport.handleRequest(req, res);
+  } finally {
+    await transport.close();
+    await server.close();
+  }
+}
+
+export async function main(): Promise<void> {
+  const gatewayConfig = loadGatewayConfig();
+  const port = getMcpListenPort();
+  const host = getMcpListenHost();
+
+  const httpServer = createServer((req, res) => {
+    void handleMcpHttpRequest(req, res, gatewayConfig).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`HTTP request handling failed: ${message}`);
+
+      if (!res.headersSent) {
+        respondJson(res, 500, {
+          error: "internal_error",
+          message: "Internal server error"
+        });
+      }
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once("error", reject);
+    httpServer.listen(port, host, () => resolve());
+  });
+
+  console.error(`OpenClaw MCP Gateway listening on http://${host}:${port}/mcp`);
 }
 
 const entryPoint = process.argv[1];

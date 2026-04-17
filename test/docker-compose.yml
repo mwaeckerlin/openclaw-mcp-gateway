@@ -18,10 +18,12 @@ services:
       context: ..
       dockerfile: Dockerfile
     image: mwaeckerlin/openclaw-mcp-gateway
+    network_mode: service:openclaw
     environment:
-      OPENCLAW_GATEWAY_URL: http://openclaw:18789
+      OPENCLAW_GATEWAY_URL: http://127.0.0.1:18789
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
-    stdin_open: true
+      OPENCLAW_MCP_HOST: 0.0.0.0
+      OPENCLAW_MCP_PORT: 3000
     depends_on:
       openclaw:
         condition: service_healthy
@@ -31,10 +33,11 @@ services:
       context: ..
       dockerfile: test/Dockerfile
     working_dir: /workspace
-    network_mode: service:openclaw
+    network_mode: service:mcp-gateway
     environment:
-      - OPENCLAW_E2E_GATEWAY_URL=${OPENCLAW_E2E_GATEWAY_URL:-http://127.0.0.1:18789}
+      - OPENCLAW_E2E_GATEWAY_URL=http://openclaw:18789
       - OPENCLAW_E2E_GATEWAY_TOKEN=${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
+      - OPENCLAW_E2E_MCP_URL=http://127.0.0.1:3000/mcp
     depends_on:
       openclaw:
         condition: service_healthy

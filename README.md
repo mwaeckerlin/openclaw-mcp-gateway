@@ -1,6 +1,6 @@
 # OpenClaw MCP Gateway
 
-MCP server to give SSH-sandboxed AI agents limited access to OpenClaw Gateway operations.
+MCP server to give SSH-sandboxed AI agents limited access to OpenClaw Gateway operations over network MCP HTTP transport.
 
 ## Runtime context
 
@@ -28,6 +28,8 @@ No payload-mapping environment variables are used.
 - `OPENCLAW_GATEWAY_URL` (required): Gateway base URL
 - `OPENCLAW_GATEWAY_TOKEN` (preferred) or `OPENCLAW_GATEWAY_TOKEN_FILE`
 - legacy compatibility: `OPENCLAW_GATEWAY_KEY` / `OPENCLAW_GATEWAY_KEY_FILE`
+- `OPENCLAW_MCP_HOST` (optional, default `0.0.0.0`)
+- `OPENCLAW_MCP_PORT` (optional, default `3000`)
 
 ## Local development
 
@@ -42,6 +44,8 @@ OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
 npm start
 ```
 
+The server listens on `http://<OPENCLAW_MCP_HOST>:<OPENCLAW_MCP_PORT>/mcp`.
+
 ## Docker
 
 `Dockerfile` uses:
@@ -55,8 +59,10 @@ docker build -t mwaeckerlin/openclaw-mcp-gateway .
 
 ```bash
 docker run --rm -it \
+  -p 3000:3000 \
   -e OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
   -e OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
+  -e OPENCLAW_MCP_PORT=3000 \
   mwaeckerlin/openclaw-mcp-gateway
 ```
 
@@ -85,18 +91,18 @@ Optional overrides:
 
 - `OPENCLAW_E2E_GATEWAY_TOKEN` (default: `test-gateway-token`)
 - `OPENCLAW_E2E_OPENAI_API_KEY` (default: `test-openai-key`)
+- `OPENCLAW_E2E_MCP_URL` (default: `http://mcp-gateway:3000/mcp`)
 
-## MCP client example (stdio)
+## MCP client example (streamable HTTP)
 
 ```json
 {
   "mcpServers": {
     "openclaw-gateway": {
-      "command": "node",
-      "args": ["/absolute/path/to/openclaw-mcp-gateway/dist/server.js"],
-      "env": {
-        "OPENCLAW_GATEWAY_URL": "http://127.0.0.1:18789",
-        "OPENCLAW_GATEWAY_TOKEN": "your-gateway-token"
+      "transport": "streamable-http",
+      "url": "http://127.0.0.1:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer your-gateway-token"
       }
     }
   }
