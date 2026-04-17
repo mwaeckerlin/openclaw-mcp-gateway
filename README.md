@@ -27,6 +27,7 @@ No payload-mapping environment variables are used.
 
 - `OPENCLAW_GATEWAY_URL` (required): Gateway base URL
 - `OPENCLAW_GATEWAY_TOKEN` (preferred) or `OPENCLAW_GATEWAY_TOKEN_FILE`
+- if present, `/run/secret/openclaw_gateway_token` is used automatically
 - legacy compatibility: `OPENCLAW_GATEWAY_KEY` / `OPENCLAW_GATEWAY_KEY_FILE`
 - `OPENCLAW_MCP_HOST` (optional, default `0.0.0.0`)
 - `OPENCLAW_MCP_PORT` (optional, default `3000`)
@@ -69,10 +70,13 @@ docker run --rm -it \
 ## docker-compose
 
 ```bash
-OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
-OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
 docker compose up --build
 ```
+
+Compose defaults:
+
+- `OPENCLAW_GATEWAY_URL=https://localhost:18789`
+- `OPENCLAW_GATEWAY_TOKEN=test-gateway-token`
 
 ## E2E from `test/`
 

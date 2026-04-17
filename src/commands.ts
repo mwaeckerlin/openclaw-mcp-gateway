@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 
 export type AllowedToolName =
@@ -102,7 +102,8 @@ function readSecret(
   inlineEnvVar: string,
   fileEnvVar: string,
   legacyInlineEnvVar?: string,
-  legacyFileEnvVar?: string
+  legacyFileEnvVar?: string,
+  defaultFilePath?: string
 ): string {
   const inline = process.env[inlineEnvVar]?.trim();
   if (inline) {
@@ -138,6 +139,14 @@ function readSecret(
     }
   }
 
+  if (defaultFilePath && existsSync(defaultFilePath)) {
+    const fileValue = readFileSync(defaultFilePath, "utf8").trim();
+    if (fileValue) {
+      return validateGatewayToken(fileValue);
+    }
+    throw new Error(`${defaultFilePath} is empty`);
+  }
+
   const inlineHint = legacyInlineEnvVar ? `${inlineEnvVar} or ${legacyInlineEnvVar}` : inlineEnvVar;
   const fileHint = legacyFileEnvVar ? `${fileEnvVar} or ${legacyFileEnvVar}` : fileEnvVar;
   throw new Error(`Set ${inlineHint} or ${fileHint}`);
@@ -155,7 +164,8 @@ export function loadGatewayConfig(): GatewayConfig {
       "OPENCLAW_GATEWAY_TOKEN",
       "OPENCLAW_GATEWAY_TOKEN_FILE",
       "OPENCLAW_GATEWAY_KEY",
-      "OPENCLAW_GATEWAY_KEY_FILE"
+      "OPENCLAW_GATEWAY_KEY_FILE",
+      "/run/secret/openclaw_gateway_token"
     )
   };
 }

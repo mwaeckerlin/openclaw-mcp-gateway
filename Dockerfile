@@ -1,21 +1,15 @@
-FROM mwaeckerlin/nodejs-build AS build
-USER root
-WORKDIR /app
-ENV NODE_EXTRA_CA_CERTS=""
+FROM mwaeckerlin/nodejs-build as modules
+ADD --chown=${BUILD_USER} package.json package.json
+ADD --chown=${BUILD_USER} package-lock.json package-lock.json
+RUN NODE_ENV=production npm install
 
-COPY package.json package-lock.json* ./
-RUN npm ci
+FROM modules as build
+RUN NODE_ENV=development npm install
+ADD --chown=${BUILD_USER} . .
+RUN NODE_ENV=production npm run build
 
-COPY tsconfig.json ./
-COPY src ./src
-RUN npm run build && npm prune --omit=dev
-
-FROM mwaeckerlin/nodejs AS runtime
-WORKDIR /app
-ENV NODE_ENV=production
-
-COPY --from=build /app/package.json ./
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-
+FROM mwaeckerlin/nodejs as production
+EXPOSE 4000
+COPY --from=build /app/dist /app/dist
+COPY --from=modules /app/node_modules node_modules
 CMD ["dist/server.js"]
