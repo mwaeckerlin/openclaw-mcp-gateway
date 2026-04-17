@@ -106,12 +106,6 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
     if (operation.requestKind === "invoke") {
       const payload = gatewayConfig.invokePayloads[toolName];
       if (!payload) {
-        if (!operation.payloadEnvVar) {
-          throw new McpError(
-            ErrorCode.InternalError,
-            `Server configuration error: ${toolName} is missing payload env mapping metadata`
-          );
-        }
         throw new McpError(
           ErrorCode.InternalError,
           `${toolName} is not supported by the current Gateway API (missing ${operation.payloadEnvVar})`

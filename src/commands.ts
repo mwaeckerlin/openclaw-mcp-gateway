@@ -11,12 +11,22 @@ export interface GatewayInvokePayload {
   arguments?: Record<string, unknown>;
 }
 
-export interface AllowedGatewayOperation {
+interface BaseGatewayOperation {
   requestKind: "invoke" | "check";
   timeoutMs: number;
   description: string;
-  payloadEnvVar?: string;
 }
+
+interface InvokeGatewayOperation extends BaseGatewayOperation {
+  requestKind: "invoke";
+  payloadEnvVar: string;
+}
+
+interface CheckGatewayOperation extends BaseGatewayOperation {
+  requestKind: "check";
+}
+
+export type AllowedGatewayOperation = InvokeGatewayOperation | CheckGatewayOperation;
 
 export interface GatewayConfig {
   baseUrl: string;
@@ -34,7 +44,7 @@ export const ALLOWED_GATEWAY_OPERATIONS: Record<AllowedToolName, AllowedGatewayO
   openclaw_gateway_status: {
     requestKind: "check",
     timeoutMs: 12_000,
-    description: "Return OpenClaw gateway health from GET /api/v1/check."
+    description: "Return OpenClaw gateway status from GET /api/v1/check."
   },
   openclaw_logs: {
     requestKind: "invoke",
@@ -161,7 +171,7 @@ function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayl
 }
 
 function loadOptionalInvokePayload(operation: AllowedGatewayOperation): GatewayInvokePayload | undefined {
-  if (operation.requestKind !== "invoke" || !operation.payloadEnvVar) {
+  if (operation.requestKind !== "invoke") {
     return undefined;
   }
 
