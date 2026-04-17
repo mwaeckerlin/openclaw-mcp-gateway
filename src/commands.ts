@@ -125,6 +125,10 @@ function readSecret(
   throw new Error(`Set ${inlineHint} or ${fileHint}`);
 }
 
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayload {
   let parsed: unknown;
   try {
@@ -133,27 +137,22 @@ function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayl
     throw new Error(`${envVar} must be valid JSON`);
   }
 
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+  if (!isJsonRecord(parsed)) {
     throw new Error(`${envVar} must be a JSON object`);
   }
 
   const payload = parsed as { tool?: unknown; arguments?: unknown };
-  const toolName = typeof payload.tool === "string" ? payload.tool.trim() : "";
-  if (!toolName) {
+  const gatewayToolName = typeof payload.tool === "string" ? payload.tool.trim() : "";
+  if (!gatewayToolName) {
     throw new Error(`${envVar} must include a non-empty string field 'tool'`);
   }
 
-  if (
-    payload.arguments !== undefined &&
-    (payload.arguments === null ||
-      typeof payload.arguments !== "object" ||
-      Array.isArray(payload.arguments))
-  ) {
+  if (payload.arguments !== undefined && !isJsonRecord(payload.arguments)) {
     throw new Error(`${envVar}.arguments must be a JSON object when provided`);
   }
 
   return {
-    tool: toolName,
+    tool: gatewayToolName,
     arguments: payload.arguments as Record<string, unknown> | undefined
   };
 }
