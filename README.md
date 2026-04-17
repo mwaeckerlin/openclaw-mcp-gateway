@@ -30,7 +30,7 @@ No payload-mapping environment variables are used.
 - if present, `/run/secret/openclaw_gateway_token` is used automatically
 - legacy compatibility: `OPENCLAW_GATEWAY_KEY` / `OPENCLAW_GATEWAY_KEY_FILE`
 - `OPENCLAW_MCP_HOST` (optional, default `0.0.0.0`)
-- `OPENCLAW_MCP_PORT` (optional, default `3000`)
+- `OPENCLAW_MCP_PORT` (optional, default `4000`)
 
 ## Local development
 
@@ -60,10 +60,10 @@ docker build -t mwaeckerlin/openclaw-mcp-gateway .
 
 ```bash
 docker run --rm -it \
-  -p 3000:3000 \
+  -p 4000:4000 \
   -e OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
   -e OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
-  -e OPENCLAW_MCP_PORT=3000 \
+  -e OPENCLAW_MCP_PORT=4000 \
   mwaeckerlin/openclaw-mcp-gateway
 ```
 
@@ -95,7 +95,7 @@ Optional overrides:
 
 - `OPENCLAW_E2E_GATEWAY_TOKEN` (default: `test-gateway-token`)
 - `OPENCLAW_E2E_OPENAI_API_KEY` (default: `test-openai-key`)
-- `OPENCLAW_E2E_MCP_URL` (default: `http://mcp-gateway:3000/mcp`)
+- `OPENCLAW_E2E_MCP_URL` (default: `http://mcp-gateway:4000/mcp`)
 
 ## MCP client example (streamable HTTP)
 
@@ -104,7 +104,7 @@ Optional overrides:
   "mcpServers": {
     "openclaw-gateway": {
       "transport": "streamable-http",
-      "url": "http://127.0.0.1:3000/mcp",
+      "url": "http://127.0.0.1:4000/mcp",
       "headers": {
         "Authorization": "Bearer your-gateway-token"
       }
@@ -119,3 +119,11 @@ Optional overrides:
 - https://github.com/openclaw/openclaw/blob/main/docs/reference/rpc.md
 - https://github.com/openclaw/openclaw/blob/main/src/gateway/tools-invoke-http.ts
 - https://github.com/openclaw/openclaw/blob/main/src/agents/tool-catalog.ts
+
+## E2E implementation plan
+
+1. Stabilize container image build for the mandated Dockerfile in CI and `test/docker-compose.yml`.
+2. Keep the three-container flow (`openclaw` → `mcp-gateway` → `test-client`) as the required E2E path.
+3. Expand `test-client` assertions to verify both positive tool calls and negative cases over real MCP HTTP.
+4. Add explicit readiness checks for OpenClaw and MCP endpoints before test execution.
+5. Make the compose E2E run (`cd test && docker compose up --build --abort-on-container-exit --exit-code-from test-client`) a required CI gate.

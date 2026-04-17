@@ -208,7 +208,7 @@ function createMcpServer(gatewayConfig: GatewayConfig): Server {
 function getMcpListenPort(): number {
   const rawPort = process.env.OPENCLAW_MCP_PORT?.trim();
   if (!rawPort) {
-    return 3000;
+    return 4000;
   }
 
   const parsed = Number.parseInt(rawPort, 10);

@@ -8,5 +8,5 @@ services:
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-https://localhost:18789}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-test-gateway-token}
     ports:
-      - "3000:3000"
+      - "4000:4000"
     restart: unless-stopped
