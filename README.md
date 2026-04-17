@@ -124,6 +124,19 @@ OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"<verified-status-tool>","action":"<option
 docker compose up --build
 ```
 
+## Run E2E tests from `test/` directory
+
+The repository includes a dedicated `test/docker-compose.yml` for E2E execution.
+
+From `test/`, `docker compose up` installs dependencies and runs `npm run test` in-container.
+
+```bash
+cd test
+OPENCLAW_E2E_GATEWAY_URL="http://host.docker.internal:18789" \
+OPENCLAW_E2E_GATEWAY_TOKEN="your-gateway-token" \
+docker compose up --build --abort-on-container-exit --exit-code-from e2e
+```
+
 ## MCP client configuration example (stdio)
 
 ```json
