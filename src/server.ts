@@ -7,7 +7,7 @@ import {
   McpError
 } from "@modelcontextprotocol/sdk/types.js";
 import {
-  ALLOWED_GATEWAY_REQUESTS,
+  ALLOWED_GATEWAY_OPERATIONS,
   GatewayConfig,
   isAllowedToolName,
   loadGatewayConfig
@@ -42,41 +42,106 @@ function formatErrorBody(bodyText: string): string {
   return trimmed.length <= maxLength ? trimmed : `${trimmed.slice(0, maxLength)}...`;
 }
 
+function messageSuggestsNotSupported(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("endpoint_disabled") ||
+    normalized.includes("tool_not_allowlisted") ||
+    normalized.includes("not allowlisted") ||
+    normalized.includes("not supported") ||
+    normalized.includes("not found")
+  );
+}
+
+function parseGatewayErrorMessage(bodyText: string): string {
+  const trimmed = bodyText.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      error?: { message?: unknown; code?: unknown; type?: unknown };
+      message?: unknown;
+    };
+
+    const errorCode =
+      parsed.error?.code && typeof parsed.error.code === "string" ? parsed.error.code : undefined;
+    const errorType =
+      parsed.error?.type && typeof parsed.error.type === "string" ? parsed.error.type : undefined;
+    const errorMessage =
+      parsed.error?.message && typeof parsed.error.message === "string"
+        ? parsed.error.message
+        : parsed.message && typeof parsed.message === "string"
+          ? parsed.message
+          : undefined;
+
+    return [errorCode, errorType, errorMessage].filter(Boolean).join(": ");
+  } catch {
+    return formatErrorBody(trimmed);
+  }
+}
+
+function isGatewayCapabilityError(status: number, details: string): boolean {
+  if ([404, 405, 501].includes(status)) {
+    return true;
+  }
+
+  return messageSuggestsNotSupported(details);
+}
+
 async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): Promise<string> {
   if (!isAllowedToolName(toolName)) {
     throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
   }
 
-  const requestSpec = ALLOWED_GATEWAY_REQUESTS[toolName];
-  const url = new URL(requestSpec.path, gatewayConfig.baseUrl);
+  const operation = ALLOWED_GATEWAY_OPERATIONS[toolName];
+  const payload = gatewayConfig.invokePayloads[toolName];
+  if (!payload) {
+    throw new McpError(
+      ErrorCode.InternalError,
+      `${toolName} is not supported by the current Gateway API (missing ${operation.payloadEnvVar})`
+    );
+  }
+
+  const url = new URL("/tools/invoke", gatewayConfig.baseUrl);
   const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), requestSpec.timeoutMs);
+  const timeout = setTimeout(() => abortController.abort(), operation.timeoutMs);
 
   try {
     const response = await fetch(url, {
-      method: requestSpec.method,
+      method: "POST",
       headers: {
         Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
-        Authorization: `Bearer ${gatewayConfig.key}`
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${gatewayConfig.token}`
       },
+      body: JSON.stringify(payload),
       signal: abortController.signal
     });
 
     const responseText = await response.text();
 
     if (!response.ok) {
-      if (response.status === 404 && requestSpec.notSupportedOn404) {
+      const details = parseGatewayErrorMessage(responseText);
+      if (isGatewayCapabilityError(response.status, details)) {
         throw new McpError(
           ErrorCode.InternalError,
           `${toolName} is not supported by the current Gateway API`
         );
       }
 
-      const details = formatErrorBody(responseText);
       const suffix = details ? `: ${details}` : "";
       throw new McpError(
         ErrorCode.InternalError,
         `Gateway request failed (${response.status} ${response.statusText})${suffix}`
+      );
+    }
+
+    if (messageSuggestsNotSupported(parseGatewayErrorMessage(responseText))) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `${toolName} is not supported by the current Gateway API`
       );
     }
 
@@ -89,7 +154,7 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
     if (error instanceof Error && error.name === "AbortError") {
       throw new McpError(
         ErrorCode.InternalError,
-        `Gateway request timed out after ${requestSpec.timeoutMs}ms`
+        `Gateway request timed out after ${operation.timeoutMs}ms`
       );
     }
 

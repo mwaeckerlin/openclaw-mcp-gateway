@@ -1,6 +1,6 @@
 # OpenClaw MCP Gateway
 
-MCP server to give SSH-sandboxed AI agents limited access to OpenClaw Gateway API operations.
+MCP server to give SSH-sandboxed AI agents limited access to OpenClaw Gateway operations.
 
 ## Why this exists
 
@@ -17,30 +17,49 @@ This server is allowlist-only:
 - No arbitrary argument forwarding from MCP clients
 - No dynamic endpoint selection from MCP input
 
-Each MCP tool maps to one fixed Gateway HTTP request with a fixed timeout.
+Each MCP tool maps to one fixed Gateway **`POST /tools/invoke`** request with a fixed timeout.
 
 ## Supported MCP tools
 
-- `openclaw_status` → `GET /api/v1/status`
-- `openclaw_gateway_status` → `GET /api/v1/gateway/status`
-- `openclaw_logs` → `GET /api/v1/logs?tail=200`
+The MCP tools are fixed:
 
-If `openclaw_logs` receives HTTP 404 from the Gateway API, the tool returns a clear not-supported error (`openclaw_logs is not supported by the current Gateway API`).
+- `openclaw_status`
+- `openclaw_gateway_status`
+- `openclaw_logs`
+
+To avoid inventing Gateway tool names or payload schemas, each tool is mapped through an explicit environment variable that contains the exact `POST /tools/invoke` payload JSON.
+
+If the mapping is missing, or Gateway returns capability errors (for example endpoint/tool not supported or not allowlisted), the MCP tool returns a clear `not supported by the current Gateway API` error.
 
 ## Prerequisites
 
 - Node.js 22+ (or compatible modern Node.js runtime)
 - npm
 - Network access from this service to the OpenClaw Gateway
-- OpenClaw Gateway API credentials
+- OpenClaw Gateway API token
 
 ## Required environment variables
 
-- `OPENCLAW_GATEWAY_URL` (required): Base URL for the Gateway API (http/https)
-- `OPENCLAW_GATEWAY_KEY` (optional if file is used): API key/token
-- `OPENCLAW_GATEWAY_KEY_FILE` (optional): absolute path to a file containing the API key/token (useful for Docker/Kubernetes secrets)
+Gateway connection/auth:
 
-Set either `OPENCLAW_GATEWAY_KEY` **or** `OPENCLAW_GATEWAY_KEY_FILE`.
+- `OPENCLAW_GATEWAY_URL` (required): Base URL for the Gateway API (http/https)
+- `OPENCLAW_GATEWAY_TOKEN` (preferred, optional if file/legacy key is used): Bearer token
+- `OPENCLAW_GATEWAY_TOKEN_FILE` (optional): absolute path to a file containing the token
+- `OPENCLAW_GATEWAY_KEY` / `OPENCLAW_GATEWAY_KEY_FILE` (legacy compatibility aliases)
+
+Set one of: `OPENCLAW_GATEWAY_TOKEN`, `OPENCLAW_GATEWAY_TOKEN_FILE`, `OPENCLAW_GATEWAY_KEY`, or `OPENCLAW_GATEWAY_KEY_FILE`.
+
+Tool payload mappings (optional, but required per tool you want enabled):
+
+- `OPENCLAW_STATUS_PAYLOAD_JSON` for `openclaw_status`
+- `OPENCLAW_GATEWAY_STATUS_PAYLOAD_JSON` for `openclaw_gateway_status`
+- `OPENCLAW_LOGS_PAYLOAD_JSON` for `openclaw_logs`
+
+Each payload variable must be valid JSON object for Gateway `/tools/invoke`, e.g.:
+
+```json
+{"tool":"status","arguments":{}}
+```
 
 ## Local development setup
 
@@ -56,19 +75,12 @@ npm run build
 
 ## Run locally
 
-Using direct key environment variable:
-
 ```bash
-OPENCLAW_GATEWAY_URL="https://gateway.example.com" \
-OPENCLAW_GATEWAY_KEY="your-api-key" \
-npm start
-```
-
-Using key file:
-
-```bash
-OPENCLAW_GATEWAY_URL="https://gateway.example.com" \
-OPENCLAW_GATEWAY_KEY_FILE="/run/secrets/openclaw_gateway_key" \
+OPENCLAW_GATEWAY_URL="http://127.0.0.1:18789" \
+OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
+OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"status","arguments":{}}' \
+OPENCLAW_GATEWAY_STATUS_PAYLOAD_JSON='{"tool":"gateway_status","arguments":{}}' \
+OPENCLAW_LOGS_PAYLOAD_JSON='{"tool":"logs","arguments":{"tail":200}}' \
 npm start
 ```
 
@@ -82,32 +94,22 @@ docker build -t openclaw-mcp-gateway:local .
 
 ```bash
 docker run --rm -it \
-  -e OPENCLAW_GATEWAY_URL="https://gateway.example.com" \
-  -e OPENCLAW_GATEWAY_KEY="your-api-key" \
-  openclaw-mcp-gateway:local
-```
-
-Example with secret file mounted into container:
-
-```bash
-docker run --rm -it \
-  -e OPENCLAW_GATEWAY_URL="https://gateway.example.com" \
-  -e OPENCLAW_GATEWAY_KEY_FILE="/run/secrets/openclaw_gateway_key" \
-  -v /host/path/openclaw_gateway_key:/run/secrets/openclaw_gateway_key:ro \
+  -e OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
+  -e OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
+  -e OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"status","arguments":{}}' \
   openclaw-mcp-gateway:local
 ```
 
 ## Run with docker-compose
 
 ```bash
-OPENCLAW_GATEWAY_URL="https://gateway.example.com" \
-OPENCLAW_GATEWAY_KEY="your-api-key" \
+OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
+OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
+OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"status","arguments":{}}' \
 docker compose up --build
 ```
 
 ## MCP client configuration example (stdio)
-
-Example configuration (shape may vary by client):
 
 ```json
 {
@@ -116,25 +118,9 @@ Example configuration (shape may vary by client):
       "command": "node",
       "args": ["/absolute/path/to/openclaw-mcp-gateway/dist/server.js"],
       "env": {
-        "OPENCLAW_GATEWAY_URL": "https://gateway.example.com",
-        "OPENCLAW_GATEWAY_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
-
-For development, you can also point to tsx:
-
-```json
-{
-  "mcpServers": {
-    "openclaw-gateway": {
-      "command": "npx",
-      "args": ["tsx", "/absolute/path/to/openclaw-mcp-gateway/src/server.ts"],
-      "env": {
-        "OPENCLAW_GATEWAY_URL": "https://gateway.example.com",
-        "OPENCLAW_GATEWAY_KEY": "your-api-key"
+        "OPENCLAW_GATEWAY_URL": "http://127.0.0.1:18789",
+        "OPENCLAW_GATEWAY_TOKEN": "your-gateway-token",
+        "OPENCLAW_STATUS_PAYLOAD_JSON": "{\"tool\":\"status\",\"arguments\":{}}"
       }
     }
   }
@@ -143,14 +129,13 @@ For development, you can also point to tsx:
 
 ## Limitations
 
-- Only three fixed tools are available
-- Tool inputs are intentionally empty in this first version
-- The server depends on currently available Gateway API endpoints
-- No streaming, pagination, or advanced filtering beyond fixed `tail=200`
+- Only three fixed MCP tools are available
+- Tool inputs are intentionally empty in this version
+- Each tool needs an explicit payload mapping env var; unmapped tools return not-supported
+- Behavior depends on what the current Gateway policy allowlists for `/tools/invoke`
 
 ## Future extension ideas
 
+- Add startup capability probes for mapped tools
 - Add more allowlisted tools (still fixed and explicit)
-- Add structured parsing for status responses
-- Add configurable but bounded log tail values if Gateway supports it
-- Add metrics/health integration for deployment environments
+- Add richer structured parsing of invoke results
