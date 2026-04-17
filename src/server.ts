@@ -64,10 +64,8 @@ function parseGatewayErrorMessage(bodyText: string): string {
       message?: unknown;
     };
 
-    const errorCode =
-      parsed.error?.code && typeof parsed.error.code === "string" ? parsed.error.code : undefined;
-    const errorType =
-      parsed.error?.type && typeof parsed.error.type === "string" ? parsed.error.type : undefined;
+    const errorCode = typeof parsed.error?.code === "string" ? parsed.error.code : undefined;
+    const errorType = typeof parsed.error?.type === "string" ? parsed.error.type : undefined;
     const errorMessage =
       parsed.error?.message && typeof parsed.error.message === "string"
         ? parsed.error.message

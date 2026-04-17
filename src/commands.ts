@@ -138,7 +138,8 @@ function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayl
   }
 
   const payload = parsed as { tool?: unknown; arguments?: unknown };
-  if (typeof payload.tool !== "string" || !payload.tool.trim()) {
+  const toolName = typeof payload.tool === "string" ? payload.tool.trim() : "";
+  if (!toolName) {
     throw new Error(`${envVar} must include a non-empty string field 'tool'`);
   }
 
@@ -152,7 +153,7 @@ function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayl
   }
 
   return {
-    tool: payload.tool.trim(),
+    tool: toolName,
     arguments: payload.arguments as Record<string, unknown> | undefined
   };
 }

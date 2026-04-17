@@ -61,6 +61,12 @@ Each payload variable must be valid JSON object for Gateway `/tools/invoke`, e.g
 {"tool":"status","arguments":{}}
 ```
 
+Example mapping (MCP tool → env var → Gateway payload):
+
+- `openclaw_status` → `OPENCLAW_STATUS_PAYLOAD_JSON` → `{"tool":"status","arguments":{}}`
+- `openclaw_gateway_status` → `OPENCLAW_GATEWAY_STATUS_PAYLOAD_JSON` → `{"tool":"gateway_status","arguments":{}}`
+- `openclaw_logs` → `OPENCLAW_LOGS_PAYLOAD_JSON` → `{"tool":"logs","arguments":{"tail":200}}`
+
 ## Local development setup
 
 ```bash
