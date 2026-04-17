@@ -74,6 +74,13 @@ function isTextContent(entry: unknown): entry is { type: "text"; text: string } 
   return typedEntry.type === "text" && typeof typedEntry.text === "string";
 }
 
+function hasIsErrorTrue(value: unknown): boolean {
+  if (!value || typeof value !== "object" || !("isError" in value)) {
+    return false;
+  }
+  return value.isError === true;
+}
+
 test(
   "MCP stdio server calls live OpenClaw Gateway for all tools and handles negative cases",
   {
@@ -129,36 +136,26 @@ test(
       }
       assert.equal(gatewayStatusHandled, true);
 
-      let openclawLogsFailedAsExpected = false;
       try {
         const logsResult = await client.callTool({
           name: "openclaw_logs"
         });
-        assert.equal((logsResult as { isError?: boolean }).isError, true);
+        assert.equal(hasIsErrorTrue(logsResult), true);
         assert.match(JSON.stringify(logsResult), /not supported|missing/i);
-        openclawLogsFailedAsExpected = true;
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         assert.match(message, /not supported|missing/i);
-        openclawLogsFailedAsExpected = true;
       }
-
-      assert.equal(openclawLogsFailedAsExpected, true);
-
-      let unknownToolFailedAsExpected = false;
       try {
         const unknownToolResult = await client.callTool({
           name: "not_allowed_tool_name"
         });
-        assert.equal((unknownToolResult as { isError?: boolean }).isError, true);
+        assert.equal(hasIsErrorTrue(unknownToolResult), true);
         assert.match(JSON.stringify(unknownToolResult), /unknown tool|not found|invalid/i);
-        unknownToolFailedAsExpected = true;
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         assert.match(message, /unknown tool|not found|invalid/i);
-        unknownToolFailedAsExpected = true;
       }
-      assert.equal(unknownToolFailedAsExpected, true);
     } finally {
       await client.close();
     }
