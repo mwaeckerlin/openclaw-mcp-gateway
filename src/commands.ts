@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { isAbsolute } from "node:path";
 
 export type AllowedToolName =
   | "openclaw_status"
@@ -62,19 +63,40 @@ function normalizeUrl(rawUrl: string): string {
 function readGatewayKey(): string {
   const inlineKey = process.env.OPENCLAW_GATEWAY_KEY?.trim();
   if (inlineKey) {
-    return inlineKey;
+    return validateGatewayKey(inlineKey);
   }
 
   const keyFile = process.env.OPENCLAW_GATEWAY_KEY_FILE?.trim();
   if (keyFile) {
-    const fileValue = readFileSync(keyFile, "utf8").trim();
+    const validatedPath = validateKeyFilePath(keyFile);
+    const fileValue = readFileSync(validatedPath, "utf8").trim();
     if (fileValue) {
-      return fileValue;
+      return validateGatewayKey(fileValue);
     }
     throw new Error("OPENCLAW_GATEWAY_KEY_FILE is empty");
   }
 
   throw new Error("Set OPENCLAW_GATEWAY_KEY or OPENCLAW_GATEWAY_KEY_FILE");
+}
+
+function validateKeyFilePath(pathValue: string): string {
+  if (!isAbsolute(pathValue)) {
+    throw new Error("OPENCLAW_GATEWAY_KEY_FILE must be an absolute path");
+  }
+
+  if (pathValue.includes("\u0000")) {
+    throw new Error("OPENCLAW_GATEWAY_KEY_FILE contains invalid characters");
+  }
+
+  return pathValue;
+}
+
+function validateGatewayKey(key: string): string {
+  if (key.includes("\r") || key.includes("\n")) {
+    throw new Error("Gateway key must not contain line breaks");
+  }
+
+  return key;
 }
 
 export function loadGatewayConfig(): GatewayConfig {

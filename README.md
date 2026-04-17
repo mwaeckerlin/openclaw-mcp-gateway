@@ -38,7 +38,7 @@ If `openclaw_logs` receives HTTP 404 from the Gateway API, the tool returns a cl
 
 - `OPENCLAW_GATEWAY_URL` (required): Base URL for the Gateway API (http/https)
 - `OPENCLAW_GATEWAY_KEY` (optional if file is used): API key/token
-- `OPENCLAW_GATEWAY_KEY_FILE` (optional): path to a file containing the API key/token (useful for Docker/Kubernetes secrets)
+- `OPENCLAW_GATEWAY_KEY_FILE` (optional): absolute path to a file containing the API key/token (useful for Docker/Kubernetes secrets)
 
 Set either `OPENCLAW_GATEWAY_KEY` **or** `OPENCLAW_GATEWAY_KEY_FILE`.
 
