@@ -118,17 +118,17 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
     });
 
     const responseText = await response.text();
+    const gatewayMessage = parseGatewayErrorMessage(responseText);
 
     if (!response.ok) {
-      const details = parseGatewayErrorMessage(responseText);
-      if (isGatewayCapabilityError(response.status, details)) {
+      if (isGatewayCapabilityError(response.status, gatewayMessage)) {
         throw new McpError(
           ErrorCode.InternalError,
           `${toolName} is not supported by the current Gateway API`
         );
       }
 
-      const suffix = details ? `: ${details}` : "";
+      const suffix = gatewayMessage ? `: ${gatewayMessage}` : "";
       throw new McpError(
         ErrorCode.InternalError,
         `Gateway request failed (${response.status} ${response.statusText})${suffix}`
@@ -136,8 +136,7 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
     }
 
     // Some gateways return HTTP 200 with a structured error payload for unsupported tools.
-    const invokeMessage = parseGatewayErrorMessage(responseText);
-    if (messageSuggestsNotSupported(invokeMessage)) {
+    if (messageSuggestsNotSupported(gatewayMessage)) {
       throw new McpError(
         ErrorCode.InternalError,
         `${toolName} is not supported by the current Gateway API`

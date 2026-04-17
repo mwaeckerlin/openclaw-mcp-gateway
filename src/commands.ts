@@ -125,7 +125,7 @@ function readSecret(
   throw new Error(`Set ${inlineHint} or ${fileHint}`);
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
@@ -137,23 +137,23 @@ function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayl
     throw new Error(`${envVar} must be valid JSON`);
   }
 
-  if (!isJsonRecord(parsed)) {
+  if (!isPlainObject(parsed)) {
     throw new Error(`${envVar} must be a JSON object`);
   }
 
-  const payload = parsed as { tool?: unknown; arguments?: unknown };
-  const gatewayToolName = typeof payload.tool === "string" ? payload.tool.trim() : "";
+  const payloadData = parsed as { tool?: unknown; arguments?: unknown };
+  const gatewayToolName = typeof payloadData.tool === "string" ? payloadData.tool.trim() : "";
   if (!gatewayToolName) {
     throw new Error(`${envVar} must include a non-empty string field 'tool'`);
   }
 
-  if (payload.arguments !== undefined && !isJsonRecord(payload.arguments)) {
+  if (payloadData.arguments !== undefined && !isPlainObject(payloadData.arguments)) {
     throw new Error(`${envVar}.arguments must be a JSON object when provided`);
   }
 
   return {
     tool: gatewayToolName,
-    arguments: payload.arguments as Record<string, unknown> | undefined
+    arguments: payloadData.arguments as Record<string, unknown> | undefined
   };
 }
 
