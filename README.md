@@ -140,7 +140,7 @@ Optional overrides:
 - `OPENCLAW_E2E_GATEWAY_TOKEN` (default: `test-gateway-token`)
 - `OPENCLAW_E2E_OPENAI_API_KEY` (default: `test-openai-key`)
 - `OPENCLAW_E2E_SANDBOX_SSH_PRIVATE_KEY` (default: `test-sandbox-key`)
-- `OPENCLAW_E2E_STATUS_PAYLOAD_JSON` (default from test file: `{"tool":"sessions_list","action":"json","args":{}}`)
+- `OPENCLAW_E2E_STATUS_PAYLOAD_JSON` (default: `{"tool":"sessions_list","action":"json","args":{}}`)
 
 ## MCP client configuration example (stdio)
 
