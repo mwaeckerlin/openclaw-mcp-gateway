@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test src/commands.test.ts src/server.integration.test.ts",
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts"
   },
