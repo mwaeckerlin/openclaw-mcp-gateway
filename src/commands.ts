@@ -50,8 +50,7 @@ function normalizeUrl(rawUrl: string): string {
     throw new Error("OPENCLAW_GATEWAY_URL is empty");
   }
 
-  const normalized = trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
-  const parsed = new URL(normalized);
+  const parsed = new URL(trimmed);
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new Error("OPENCLAW_GATEWAY_URL must use http or https");

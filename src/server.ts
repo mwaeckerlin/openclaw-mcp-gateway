@@ -57,8 +57,7 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
       method: requestSpec.method,
       headers: {
         Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
-        Authorization: `Bearer ${gatewayConfig.key}`,
-        "X-API-Key": gatewayConfig.key
+        Authorization: `Bearer ${gatewayConfig.key}`
       },
       signal: abortController.signal
     });
