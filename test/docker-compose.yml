@@ -14,8 +14,10 @@ services:
       timeout: 3s
       retries: 30
 
-  e2e:
-    image: node:22-bookworm
+  test-client:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile
     working_dir: /workspace
     volumes:
       - ..:/workspace
@@ -26,4 +28,3 @@ services:
     depends_on:
       gateway:
         condition: service_healthy
-    command: sh -c "npm ci && npm run test"

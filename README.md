@@ -128,11 +128,11 @@ docker compose up --build
 
 The repository includes a dedicated `test/docker-compose.yml` for E2E execution.
 
-From `test/`, `docker compose up` starts `mwaeckerlin/openclaw:gateway` and runs `npm run test` in a separate `e2e` container against that live Gateway.
+From `test/`, `docker compose up` builds a dedicated `test-client` container, starts `mwaeckerlin/openclaw:gateway`, and runs `npm run test` against that live Gateway.
 
 ```bash
 cd test
-docker compose up --abort-on-container-exit --exit-code-from e2e
+docker compose up --abort-on-container-exit --exit-code-from test-client
 ```
 
 Optional overrides:

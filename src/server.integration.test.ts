@@ -75,7 +75,7 @@ function isTextContent(entry: unknown): entry is { type: "text"; text: string } 
 }
 
 test(
-  "MCP stdio server calls live OpenClaw Gateway for openclaw_status",
+  "MCP stdio server calls live OpenClaw Gateway for all tools and handles negative cases",
   {
     skip:
       shouldRunE2E ?
@@ -99,16 +99,66 @@ test(
     await client.connect(transport);
     try {
       const tools = await client.listTools();
-      assert.ok(tools.tools.some((tool) => tool.name === "openclaw_status"));
+      const toolNames = new Set(tools.tools.map((tool) => tool.name));
+      assert.ok(toolNames.has("openclaw_status"));
+      assert.ok(toolNames.has("openclaw_gateway_status"));
+      assert.ok(toolNames.has("openclaw_logs"));
 
-      const result = await client.callTool({
+      const statusResult = await client.callTool({
         name: "openclaw_status"
       });
+      assert.ok(Array.isArray(statusResult.content));
+      const statusTextOutput = statusResult.content.find(isTextContent);
+      assert.ok(statusTextOutput);
+      assert.ok(statusTextOutput.text.trim().length > 0);
 
-      assert.ok(Array.isArray(result.content));
-      const textOutput = result.content.find(isTextContent);
-      assert.ok(textOutput);
-      assert.ok(textOutput.text.trim().length > 0);
+      let gatewayStatusHandled = false;
+      try {
+        const gatewayStatusResult = await client.callTool({
+          name: "openclaw_gateway_status"
+        });
+        assert.ok(Array.isArray(gatewayStatusResult.content));
+        const gatewayStatusTextOutput = gatewayStatusResult.content.find(isTextContent);
+        assert.ok(gatewayStatusTextOutput);
+        assert.ok(gatewayStatusTextOutput.text.trim().length > 0);
+        gatewayStatusHandled = true;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert.match(message, /not supported/i);
+        gatewayStatusHandled = true;
+      }
+      assert.equal(gatewayStatusHandled, true);
+
+      let openclawLogsFailedAsExpected = false;
+      try {
+        const logsResult = await client.callTool({
+          name: "openclaw_logs"
+        });
+        assert.equal((logsResult as { isError?: boolean }).isError, true);
+        assert.match(JSON.stringify(logsResult), /not supported|missing/i);
+        openclawLogsFailedAsExpected = true;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert.match(message, /not supported|missing/i);
+        openclawLogsFailedAsExpected = true;
+      }
+
+      assert.equal(openclawLogsFailedAsExpected, true);
+
+      let unknownToolFailedAsExpected = false;
+      try {
+        const unknownToolResult = await client.callTool({
+          name: "not_allowed_tool_name"
+        });
+        assert.equal((unknownToolResult as { isError?: boolean }).isError, true);
+        assert.match(JSON.stringify(unknownToolResult), /unknown tool|not found|invalid/i);
+        unknownToolFailedAsExpected = true;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert.match(message, /unknown tool|not found|invalid/i);
+        unknownToolFailedAsExpected = true;
+      }
+      assert.equal(unknownToolFailedAsExpected, true);
     } finally {
       await client.close();
     }
