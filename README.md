@@ -62,7 +62,7 @@ Each payload variable must be a valid JSON object matching the documented `/tool
 - `sessionKey` (optional)
 - `dryRun` (optional)
 
-Verified example from OpenClaw docs/source:
+Verified `/tools/invoke` example from OpenClaw docs/source:
 
 ```json
 {"tool":"sessions_list","action":"json","args":{}}
@@ -74,6 +74,8 @@ Example mapping (MCP tool → env var):
 - `openclaw_logs` → `OPENCLAW_LOGS_PAYLOAD_JSON`
 
 Use only tool names that are verified in OpenClaw docs/source and allowlisted in your Gateway policy.
+
+The payload values in runtime examples below are **schema placeholders** only; replace them with your own verified tool/action/args combination from OpenClaw docs/source and your Gateway allowlist.
 
 ## Local development setup
 
@@ -92,8 +94,8 @@ npm run build
 ```bash
 OPENCLAW_GATEWAY_URL="http://127.0.0.1:18789" \
 OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
-OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"sessions_list","action":"json","args":{}}' \
-OPENCLAW_LOGS_PAYLOAD_JSON='{"tool":"sessions_list","action":"json","args":{}}' \
+OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"<verified-status-tool>","action":"<optional-action>","args":{}}' \
+OPENCLAW_LOGS_PAYLOAD_JSON='{"tool":"<verified-logs-tool>","action":"<optional-action>","args":{}}' \
 npm start
 ```
 
@@ -109,7 +111,7 @@ docker build -t openclaw-mcp-gateway:local .
 docker run --rm -it \
   -e OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
   -e OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
-  -e OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"sessions_list","action":"json","args":{}}' \
+  -e OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"<verified-status-tool>","action":"<optional-action>","args":{}}' \
   openclaw-mcp-gateway:local
 ```
 
@@ -118,7 +120,7 @@ docker run --rm -it \
 ```bash
 OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
 OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
-OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"sessions_list","action":"json","args":{}}' \
+OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"<verified-status-tool>","action":"<optional-action>","args":{}}' \
 docker compose up --build
 ```
 
@@ -133,7 +135,7 @@ docker compose up --build
         "env": {
           "OPENCLAW_GATEWAY_URL": "http://127.0.0.1:18789",
           "OPENCLAW_GATEWAY_TOKEN": "your-gateway-token",
-          "OPENCLAW_STATUS_PAYLOAD_JSON": "{\"tool\":\"sessions_list\",\"action\":\"json\",\"args\":{}}"
+          "OPENCLAW_STATUS_PAYLOAD_JSON": "{\"tool\":\"<verified-status-tool>\",\"action\":\"<optional-action>\",\"args\":{}}"
         }
       }
     }
