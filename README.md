@@ -134,7 +134,7 @@ From `test/`, `docker compose up` installs dependencies and runs `npm run test` 
 cd test
 OPENCLAW_E2E_GATEWAY_URL="http://host.docker.internal:18789" \
 OPENCLAW_E2E_GATEWAY_TOKEN="your-gateway-token" \
-docker compose up --build --abort-on-container-exit --exit-code-from e2e
+docker compose up --abort-on-container-exit --exit-code-from e2e
 ```
 
 ## MCP client configuration example (stdio)

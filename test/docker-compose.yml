@@ -10,4 +10,4 @@ services:
       OPENCLAW_E2E_STATUS_PAYLOAD_JSON: ${OPENCLAW_E2E_STATUS_PAYLOAD_JSON:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: sh -lc "npm ci && npm run test"
+    command: sh -c "npm ci && npm run test"
