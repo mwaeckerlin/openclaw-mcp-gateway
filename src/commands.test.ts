@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadGatewayConfig } from "./commands.js";
+import { ALLOWED_GATEWAY_OPERATIONS, loadGatewayConfig } from "./commands.js";
 
 const ENV_KEYS = [
   "OPENCLAW_GATEWAY_URL",
   "OPENCLAW_GATEWAY_TOKEN",
   "OPENCLAW_GATEWAY_TOKEN_FILE",
   "OPENCLAW_GATEWAY_KEY",
-  "OPENCLAW_GATEWAY_KEY_FILE",
-  "OPENCLAW_STATUS_PAYLOAD_JSON",
-  "OPENCLAW_LOGS_PAYLOAD_JSON"
+  "OPENCLAW_GATEWAY_KEY_FILE"
 ] as const;
 
 function withEnv(env: Partial<Record<(typeof ENV_KEYS)[number], string>>, run: () => void): void {
@@ -37,36 +35,29 @@ function withEnv(env: Partial<Record<(typeof ENV_KEYS)[number], string>>, run: (
   }
 }
 
-test("loadGatewayConfig accepts documented args payload field", () => {
+test("openclaw_status uses fixed verified /tools/invoke payload mapping", () => {
+  assert.deepEqual(ALLOWED_GATEWAY_OPERATIONS.openclaw_status, {
+    requestKind: "invoke",
+    timeoutMs: 12_000,
+    description: "Return overall OpenClaw status from the Gateway API.",
+    payload: {
+      tool: "sessions_list",
+      action: "json",
+      args: {}
+    }
+  });
+});
+
+test("loadGatewayConfig reads required gateway URL and token without payload env vars", () => {
   withEnv(
     {
       OPENCLAW_GATEWAY_URL: "https://gateway.example.invalid/",
-      OPENCLAW_GATEWAY_TOKEN: "token-value",
-      OPENCLAW_STATUS_PAYLOAD_JSON: '{"tool":"sessions_list","action":"json","args":{"limit":5}}'
+      OPENCLAW_GATEWAY_TOKEN: "token-value"
     },
     () => {
       const config = loadGatewayConfig();
-      assert.deepEqual(config.invokePayloads.openclaw_status, {
-        tool: "sessions_list",
-        action: "json",
-        args: { limit: 5 }
-      });
-    }
-  );
-});
-
-test("loadGatewayConfig rejects undocumented arguments payload field", () => {
-  withEnv(
-    {
-      OPENCLAW_GATEWAY_URL: "https://gateway.example.invalid/",
-      OPENCLAW_GATEWAY_TOKEN: "token-value",
-      OPENCLAW_STATUS_PAYLOAD_JSON: '{"tool":"sessions_list","arguments":{"limit":5}}'
-    },
-    () => {
-      assert.throws(
-        () => loadGatewayConfig(),
-        /unsupported field 'arguments' \(allowed: tool, action, args, sessionKey, dryRun\)/
-      );
+      assert.equal(config.baseUrl, "https://gateway.example.invalid/");
+      assert.equal(config.token, "token-value");
     }
   );
 });

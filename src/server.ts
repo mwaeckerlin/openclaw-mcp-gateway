@@ -105,14 +105,7 @@ export async function runAllowedTool(toolName: string, gatewayConfig: GatewayCon
   try {
     let body: string | undefined;
     if (operation.requestKind === "invoke") {
-      const payload = gatewayConfig.invokePayloads[toolName];
-      if (!payload) {
-        throw new McpError(
-          ErrorCode.InternalError,
-          `${toolName} is not supported by the current Gateway API (missing ${operation.payloadEnvVar})`
-        );
-      }
-      body = JSON.stringify(payload);
+      body = JSON.stringify(operation.payload);
     }
 
     const response = await fetch(url, {

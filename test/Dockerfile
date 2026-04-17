@@ -1,5 +1,13 @@
-FROM node:22-bookworm
+FROM mwaeckerlin/nodejs-build
+USER root
 
 WORKDIR /workspace
+ENV NODE_EXTRA_CA_CERTS=""
 
-CMD ["sh", "-c", "npm ci && npm run test"]
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+
+CMD ["npm", "run", "test"]

@@ -7,9 +7,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const E2E_GATEWAY_URL = process.env.OPENCLAW_E2E_GATEWAY_URL?.trim();
 const E2E_GATEWAY_TOKEN = process.env.OPENCLAW_E2E_GATEWAY_TOKEN?.trim();
-const E2E_STATUS_PAYLOAD_JSON =
-  process.env.OPENCLAW_E2E_STATUS_PAYLOAD_JSON?.trim() ??
-  '{"tool":"sessions_list","action":"json","args":{}}';
+const E2E_STATUS_PAYLOAD_JSON = '{"tool":"sessions_list","action":"json","args":{}}';
 
 const shouldRunE2E = Boolean(E2E_GATEWAY_URL && E2E_GATEWAY_TOKEN);
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,11 +27,10 @@ function createTestEnvironment(): Record<string, string> {
 
   env.OPENCLAW_GATEWAY_URL = E2E_GATEWAY_URL;
   env.OPENCLAW_GATEWAY_TOKEN = E2E_GATEWAY_TOKEN;
-  env.OPENCLAW_STATUS_PAYLOAD_JSON = E2E_STATUS_PAYLOAD_JSON;
   return env;
 }
 
-async function waitForGatewayReady(timeoutMs = 30_000): Promise<void> {
+async function waitForGatewayReady(timeoutMs = 120_000): Promise<void> {
   if (!E2E_GATEWAY_URL || !E2E_GATEWAY_TOKEN) {
     throw new Error("Missing OPENCLAW_E2E_GATEWAY_URL or OPENCLAW_E2E_GATEWAY_TOKEN");
   }
@@ -109,7 +106,6 @@ test(
       const toolNames = new Set(tools.tools.map((tool) => tool.name));
       assert.ok(toolNames.has("openclaw_status"));
       assert.ok(toolNames.has("openclaw_gateway_status"));
-      assert.ok(toolNames.has("openclaw_logs"));
 
       const statusResult = await client.callTool({
         name: "openclaw_status"
@@ -136,16 +132,6 @@ test(
       }
       assert.equal(gatewayStatusHandled, true);
 
-      try {
-        const logsResult = await client.callTool({
-          name: "openclaw_logs"
-        });
-        assert.equal(hasIsErrorTrue(logsResult), true);
-        assert.match(JSON.stringify(logsResult), /not supported|missing/i);
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        assert.match(message, /not supported|missing/i);
-      }
       try {
         const unknownToolResult = await client.callTool({
           name: "not_allowed_tool_name"

@@ -28,14 +28,5 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {},
       additionalProperties: false
     }
-  },
-  {
-    name: "openclaw_logs",
-    description: ALLOWED_GATEWAY_OPERATIONS.openclaw_logs.description,
-    inputSchema: {
-      type: "object",
-      properties: {},
-      additionalProperties: false
-    }
   }
 ];

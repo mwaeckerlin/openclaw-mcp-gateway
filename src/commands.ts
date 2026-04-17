@@ -3,8 +3,7 @@ import { isAbsolute } from "node:path";
 
 export type AllowedToolName =
   | "openclaw_status"
-  | "openclaw_gateway_status"
-  | "openclaw_logs";
+  | "openclaw_gateway_status";
 
 export interface GatewayInvokePayload {
   tool: string;
@@ -22,7 +21,13 @@ interface BaseGatewayOperation {
 
 interface InvokeGatewayOperation extends BaseGatewayOperation {
   requestKind: "invoke";
-  payloadEnvVar: string;
+  payload: {
+    tool: string;
+    action?: string;
+    args?: Record<string, unknown>;
+    sessionKey?: string;
+    dryRun?: boolean;
+  };
 }
 
 interface CheckGatewayOperation extends BaseGatewayOperation {
@@ -34,7 +39,6 @@ export type AllowedGatewayOperation = InvokeGatewayOperation | CheckGatewayOpera
 export interface GatewayConfig {
   baseUrl: string;
   token: string;
-  invokePayloads: Partial<Record<AllowedToolName, GatewayInvokePayload>>;
 }
 
 export const ALLOWED_GATEWAY_OPERATIONS: Record<AllowedToolName, AllowedGatewayOperation> = {
@@ -42,18 +46,16 @@ export const ALLOWED_GATEWAY_OPERATIONS: Record<AllowedToolName, AllowedGatewayO
     requestKind: "invoke",
     timeoutMs: 12_000,
     description: "Return overall OpenClaw status from the Gateway API.",
-    payloadEnvVar: "OPENCLAW_STATUS_PAYLOAD_JSON"
+    payload: {
+      tool: "sessions_list",
+      action: "json",
+      args: {}
+    }
   },
   openclaw_gateway_status: {
     requestKind: "check",
     timeoutMs: 12_000,
     description: "Return OpenClaw gateway status from GET /api/v1/check."
-  },
-  openclaw_logs: {
-    requestKind: "invoke",
-    timeoutMs: 18_000,
-    description: "Return OpenClaw logs from the Gateway API.",
-    payloadEnvVar: "OPENCLAW_LOGS_PAYLOAD_JSON"
   }
 };
 
@@ -141,105 +143,10 @@ function readSecret(
   throw new Error(`Set ${inlineHint} or ${fileHint}`);
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayload {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawPayload);
-  } catch {
-    throw new Error(`${envVar} must be valid JSON`);
-  }
-
-  if (!isPlainObject(parsed)) {
-    throw new Error(`${envVar} must be a JSON object`);
-  }
-
-  const payloadData = parsed as {
-    tool?: unknown;
-    action?: unknown;
-    args?: unknown;
-    sessionKey?: unknown;
-    dryRun?: unknown;
-    [key: string]: unknown;
-  };
-
-  const allowedFields = new Set(["tool", "action", "args", "sessionKey", "dryRun"]);
-  const unexpectedField = Object.keys(payloadData).find((field) => !allowedFields.has(field));
-  if (unexpectedField) {
-    throw new Error(
-      `${envVar} contains unsupported field '${unexpectedField}' (allowed: tool, action, args, sessionKey, dryRun)`
-    );
-  }
-
-  const gatewayToolName = typeof payloadData.tool === "string" ? payloadData.tool.trim() : "";
-  if (!gatewayToolName) {
-    throw new Error(`${envVar} must include a non-empty string field 'tool'`);
-  }
-
-  if (payloadData.action !== undefined) {
-    if (typeof payloadData.action !== "string" || !payloadData.action.trim()) {
-      throw new Error(`${envVar}.action must be a non-empty string when provided`);
-    }
-  }
-
-  if (payloadData.args !== undefined && !isPlainObject(payloadData.args)) {
-    throw new Error(`${envVar}.args must be a JSON object when provided`);
-  }
-
-  if (payloadData.sessionKey !== undefined) {
-    if (typeof payloadData.sessionKey !== "string" || !payloadData.sessionKey.trim()) {
-      throw new Error(`${envVar}.sessionKey must be a non-empty string when provided`);
-    }
-  }
-
-  if (payloadData.dryRun !== undefined && typeof payloadData.dryRun !== "boolean") {
-    throw new Error(`${envVar}.dryRun must be a boolean when provided`);
-  }
-
-  return {
-    tool: gatewayToolName,
-    ...(typeof payloadData.action === "string" ? { action: payloadData.action.trim() } : {}),
-    ...(isPlainObject(payloadData.args) ? { args: payloadData.args } : {}),
-    ...(typeof payloadData.sessionKey === "string"
-      ? { sessionKey: payloadData.sessionKey.trim() }
-      : {}),
-    ...(typeof payloadData.dryRun === "boolean" ? { dryRun: payloadData.dryRun } : {})
-  };
-}
-
-function loadOptionalInvokePayload(operation: AllowedGatewayOperation): GatewayInvokePayload | undefined {
-  if (operation.requestKind !== "invoke") {
-    return undefined;
-  }
-
-  const rawPayload = process.env[operation.payloadEnvVar]?.trim();
-  if (!rawPayload) {
-    return undefined;
-  }
-
-  return parsePayloadJson(rawPayload, operation.payloadEnvVar);
-}
-
 export function loadGatewayConfig(): GatewayConfig {
   const baseUrlEnv = process.env.OPENCLAW_GATEWAY_URL;
   if (!baseUrlEnv) {
     throw new Error("OPENCLAW_GATEWAY_URL is required");
-  }
-
-  const invokePayloads: Partial<Record<AllowedToolName, GatewayInvokePayload>> = {};
-  const operationEntries = Object.entries(ALLOWED_GATEWAY_OPERATIONS) as [
-    AllowedToolName,
-    AllowedGatewayOperation
-  ][];
-
-  for (const [toolName, operation] of operationEntries) {
-    const payload = loadOptionalInvokePayload(operation);
-    if (payload) {
-      invokePayloads[toolName] = payload;
-    }
   }
 
   return {
@@ -249,7 +156,6 @@ export function loadGatewayConfig(): GatewayConfig {
       "OPENCLAW_GATEWAY_TOKEN_FILE",
       "OPENCLAW_GATEWAY_KEY",
       "OPENCLAW_GATEWAY_KEY_FILE"
-    ),
-    invokePayloads
+    )
   };
 }
