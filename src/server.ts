@@ -93,27 +93,36 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
   }
 
   const operation = ALLOWED_GATEWAY_OPERATIONS[toolName];
-  const payload = gatewayConfig.invokePayloads[toolName];
-  if (!payload) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      `${toolName} is not supported by the current Gateway API (missing ${operation.payloadEnvVar})`
-    );
-  }
-
-  const url = new URL("/tools/invoke", gatewayConfig.baseUrl);
+  const method = operation.requestKind === "check" ? "GET" : "POST";
+  const url = new URL(
+    operation.requestKind === "check" ? "/api/v1/check" : "/tools/invoke",
+    gatewayConfig.baseUrl
+  );
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), operation.timeoutMs);
 
   try {
+    let body: string | undefined;
+    if (operation.requestKind === "invoke") {
+      const payload = gatewayConfig.invokePayloads[toolName];
+      if (!payload) {
+        const payloadEnvHint = operation.payloadEnvVar ?? "payload mapping env var";
+        throw new McpError(
+          ErrorCode.InternalError,
+          `${toolName} is not supported by the current Gateway API (missing ${payloadEnvHint})`
+        );
+      }
+      body = JSON.stringify(payload);
+    }
+
     const response = await fetch(url, {
-      method: "POST",
+      method,
       headers: {
         Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
-        "Content-Type": "application/json",
+        ...(operation.requestKind === "invoke" ? { "Content-Type": "application/json" } : {}),
         Authorization: `Bearer ${gatewayConfig.token}`
       },
-      body: JSON.stringify(payload),
+      ...(body ? { body } : {}),
       signal: abortController.signal
     });
 

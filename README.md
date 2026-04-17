@@ -17,17 +17,17 @@ This server is allowlist-only:
 - No arbitrary argument forwarding from MCP clients
 - No dynamic endpoint selection from MCP input
 
-Each MCP tool maps to one fixed Gateway **`POST /tools/invoke`** request with a fixed timeout.
+Each MCP tool maps to one fixed, documented Gateway request with a fixed timeout.
 
 ## Supported MCP tools
 
-The MCP tools are fixed:
+The MCP tools are fixed and route-mapped as follows:
 
-- `openclaw_status`
-- `openclaw_gateway_status`
-- `openclaw_logs`
+- `openclaw_status` → `POST /tools/invoke` (payload via env mapping)
+- `openclaw_gateway_status` → `GET /api/v1/check`
+- `openclaw_logs` → `POST /tools/invoke` (payload via env mapping)
 
-To avoid inventing Gateway tool names or payload schemas, each tool is mapped through an explicit environment variable that contains the exact `POST /tools/invoke` payload JSON.
+To avoid inventing Gateway tool names or payload schemas, `/tools/invoke` tools are mapped through explicit environment variables containing the exact JSON payload.
 
 If the mapping is missing, or Gateway returns capability errors (for example endpoint/tool not supported or not allowlisted), the MCP tool returns a clear `not supported by the current Gateway API` error.
 
@@ -52,7 +52,6 @@ Set one of: `OPENCLAW_GATEWAY_TOKEN`, `OPENCLAW_GATEWAY_TOKEN_FILE`, `OPENCLAW_G
 Tool payload mappings (optional, but required per tool you want enabled):
 
 - `OPENCLAW_STATUS_PAYLOAD_JSON` for `openclaw_status`
-- `OPENCLAW_GATEWAY_STATUS_PAYLOAD_JSON` for `openclaw_gateway_status`
 - `OPENCLAW_LOGS_PAYLOAD_JSON` for `openclaw_logs`
 
 Each payload variable must be valid JSON object for Gateway `/tools/invoke`, e.g.:
@@ -64,7 +63,6 @@ Each payload variable must be valid JSON object for Gateway `/tools/invoke`, e.g
 Example mapping (MCP tool → env var → Gateway payload):
 
 - `openclaw_status` → `OPENCLAW_STATUS_PAYLOAD_JSON` → `{"tool":"status","arguments":{}}`
-- `openclaw_gateway_status` → `OPENCLAW_GATEWAY_STATUS_PAYLOAD_JSON` → `{"tool":"gateway_status","arguments":{}}`
 - `openclaw_logs` → `OPENCLAW_LOGS_PAYLOAD_JSON` → `{"tool":"logs","arguments":{"tail":200}}`
 
 ## Local development setup
@@ -85,7 +83,6 @@ npm run build
 OPENCLAW_GATEWAY_URL="http://127.0.0.1:18789" \
 OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
 OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"status","arguments":{}}' \
-OPENCLAW_GATEWAY_STATUS_PAYLOAD_JSON='{"tool":"gateway_status","arguments":{}}' \
 OPENCLAW_LOGS_PAYLOAD_JSON='{"tool":"logs","arguments":{"tail":200}}' \
 npm start
 ```
@@ -137,8 +134,15 @@ docker compose up --build
 
 - Only three fixed MCP tools are available
 - Tool inputs are intentionally empty in this version
-- Each tool needs an explicit payload mapping env var; unmapped tools return not-supported
+- `/tools/invoke` tools require explicit payload mapping env vars; unmapped tools return not-supported
 - Behavior depends on what the current Gateway policy allowlists for `/tools/invoke`
+
+## Documentation references used
+
+- OpenClaw Gateway Tools Invoke API:
+  https://github.com/openclaw/openclaw/blob/main/docs/gateway/tools-invoke-http-api.md
+- OpenClaw `/api/v1/check` reference:
+  https://github.com/openclaw/openclaw/blob/main/docs/reference/rpc.md
 
 ## Future extension ideas
 
