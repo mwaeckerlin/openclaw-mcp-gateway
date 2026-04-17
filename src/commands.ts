@@ -26,20 +26,17 @@ export interface GatewayConfig {
 export const ALLOWED_GATEWAY_OPERATIONS: Record<AllowedToolName, AllowedGatewayOperation> = {
   openclaw_status: {
     timeoutMs: 12_000,
-    description:
-      "Return overall OpenClaw status via Gateway POST /tools/invoke using OPENCLAW_STATUS_PAYLOAD_JSON.",
+    description: "Return overall OpenClaw status from the Gateway API.",
     payloadEnvVar: "OPENCLAW_STATUS_PAYLOAD_JSON"
   },
   openclaw_gateway_status: {
     timeoutMs: 12_000,
-    description:
-      "Return OpenClaw gateway status via Gateway POST /tools/invoke using OPENCLAW_GATEWAY_STATUS_PAYLOAD_JSON.",
+    description: "Return OpenClaw gateway status from the Gateway API.",
     payloadEnvVar: "OPENCLAW_GATEWAY_STATUS_PAYLOAD_JSON"
   },
   openclaw_logs: {
     timeoutMs: 18_000,
-    description:
-      "Return OpenClaw logs via Gateway POST /tools/invoke using OPENCLAW_LOGS_PAYLOAD_JSON.",
+    description: "Return OpenClaw logs from the Gateway API.",
     payloadEnvVar: "OPENCLAW_LOGS_PAYLOAD_JSON"
   }
 };

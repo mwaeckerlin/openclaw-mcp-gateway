@@ -47,7 +47,6 @@ function messageSuggestsNotSupported(message: string): boolean {
   return (
     normalized.includes("endpoint_disabled") ||
     normalized.includes("tool_not_allowlisted") ||
-    normalized.includes("not allowlisted") ||
     normalized.includes("not supported") ||
     normalized.includes("not found")
   );
@@ -138,6 +137,7 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
       );
     }
 
+    // Some gateways return HTTP 200 with a structured error payload for unsupported tools.
     const invokeMessage = parseGatewayErrorMessage(responseText);
     if (messageSuggestsNotSupported(invokeMessage)) {
       throw new McpError(
