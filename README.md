@@ -128,14 +128,19 @@ docker compose up --build
 
 The repository includes a dedicated `test/docker-compose.yml` for E2E execution.
 
-From `test/`, `docker compose up` installs dependencies and runs `npm run test` in-container.
+From `test/`, `docker compose up` starts `mwaeckerlin/openclaw:gateway` and runs `npm run test` in a separate `e2e` container against that live Gateway.
 
 ```bash
 cd test
-OPENCLAW_E2E_GATEWAY_URL="http://host.docker.internal:18789" \
-OPENCLAW_E2E_GATEWAY_TOKEN="your-gateway-token" \
 docker compose up --abort-on-container-exit --exit-code-from e2e
 ```
+
+Optional overrides:
+
+- `OPENCLAW_E2E_GATEWAY_TOKEN` (default: `test-gateway-token`)
+- `OPENCLAW_E2E_OPENAI_API_KEY` (default: `test-openai-key`)
+- `OPENCLAW_E2E_SANDBOX_SSH_PRIVATE_KEY` (default: `test-sandbox-key`)
+- `OPENCLAW_E2E_STATUS_PAYLOAD_JSON` (default from test file: `{"tool":"sessions_list","action":"json","args":{}}`)
 
 ## MCP client configuration example (stdio)
 

@@ -1,13 +1,34 @@
 services:
+  gateway:
+    image: mwaeckerlin/openclaw:gateway
+    user: root
+    volumes:
+      - gateway_openclaw_home:/root/.openclaw
+      - gateway_ssh_home:/root/.ssh
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
+      OPENCLAW_OPENAI_API_KEY: ${OPENCLAW_E2E_OPENAI_API_KEY:-test-openai-key}
+      OPENCLAW_SANDBOX_SSH_PRIVATE_KEY: ${OPENCLAW_E2E_SANDBOX_SSH_PRIVATE_KEY:-test-sandbox-key}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fsS http://127.0.0.1:18789/healthz >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   e2e:
     image: node:22-bookworm
     working_dir: /workspace
     volumes:
       - ..:/workspace
     environment:
-      OPENCLAW_E2E_GATEWAY_URL: ${OPENCLAW_E2E_GATEWAY_URL:-}
-      OPENCLAW_E2E_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-}
-      OPENCLAW_E2E_STATUS_PAYLOAD_JSON: ${OPENCLAW_E2E_STATUS_PAYLOAD_JSON:-}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      OPENCLAW_E2E_GATEWAY_URL: ${OPENCLAW_E2E_GATEWAY_URL:-http://gateway:18789}
+      OPENCLAW_E2E_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
+      OPENCLAW_E2E_STATUS_PAYLOAD_JSON: ${OPENCLAW_E2E_STATUS_PAYLOAD_JSON:-{"tool":"sessions_list","action":"json","args":{}}}
+    depends_on:
+      gateway:
+        condition: service_healthy
     command: sh -c "npm ci && npm run test"
+
+volumes:
+  gateway_openclaw_home:
+  gateway_ssh_home:
