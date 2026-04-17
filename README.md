@@ -27,7 +27,7 @@ The MCP tools are fixed and route-mapped as follows:
 - `openclaw_gateway_status` → `GET /api/v1/check`
 - `openclaw_logs` → `POST /tools/invoke` (payload via env mapping)
 
-To avoid inventing Gateway tool names or payload schemas, `/tools/invoke` tools are mapped through explicit environment variables containing the exact JSON payload.
+To avoid inventing Gateway tool names in code, `/tools/invoke` tools are mapped through explicit environment variables containing the exact JSON payload.
 
 If the mapping is missing, or Gateway returns capability errors (for example endpoint/tool not supported or not allowlisted), the MCP tool returns a clear `not supported by the current Gateway API` error.
 
@@ -54,16 +54,26 @@ Tool payload mappings (optional, but required per tool you want enabled):
 - `OPENCLAW_STATUS_PAYLOAD_JSON` for `openclaw_status`
 - `OPENCLAW_LOGS_PAYLOAD_JSON` for `openclaw_logs`
 
-Each payload variable must be valid JSON object for Gateway `/tools/invoke`, e.g.:
+Each payload variable must be a valid JSON object matching the documented `/tools/invoke` body shape:
+
+- `tool` (required)
+- `action` (optional)
+- `args` (optional object)
+- `sessionKey` (optional)
+- `dryRun` (optional)
+
+Verified example from OpenClaw docs/source:
 
 ```json
-{"tool":"status","arguments":{}}
+{"tool":"sessions_list","action":"json","args":{}}
 ```
 
-Example mapping (MCP tool → env var → Gateway payload):
+Example mapping (MCP tool → env var):
 
-- `openclaw_status` → `OPENCLAW_STATUS_PAYLOAD_JSON` → `{"tool":"status","arguments":{}}`
-- `openclaw_logs` → `OPENCLAW_LOGS_PAYLOAD_JSON` → `{"tool":"logs","arguments":{"tail":200}}`
+- `openclaw_status` → `OPENCLAW_STATUS_PAYLOAD_JSON`
+- `openclaw_logs` → `OPENCLAW_LOGS_PAYLOAD_JSON`
+
+Use only tool names that are verified in OpenClaw docs/source and allowlisted in your Gateway policy.
 
 ## Local development setup
 
@@ -82,8 +92,8 @@ npm run build
 ```bash
 OPENCLAW_GATEWAY_URL="http://127.0.0.1:18789" \
 OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
-OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"status","arguments":{}}' \
-OPENCLAW_LOGS_PAYLOAD_JSON='{"tool":"logs","arguments":{"tail":200}}' \
+OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"sessions_list","action":"json","args":{}}' \
+OPENCLAW_LOGS_PAYLOAD_JSON='{"tool":"sessions_list","action":"json","args":{}}' \
 npm start
 ```
 
@@ -99,7 +109,7 @@ docker build -t openclaw-mcp-gateway:local .
 docker run --rm -it \
   -e OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
   -e OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
-  -e OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"status","arguments":{}}' \
+  -e OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"sessions_list","action":"json","args":{}}' \
   openclaw-mcp-gateway:local
 ```
 
@@ -108,7 +118,7 @@ docker run --rm -it \
 ```bash
 OPENCLAW_GATEWAY_URL="http://gateway.example.local:18789" \
 OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
-OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"status","arguments":{}}' \
+OPENCLAW_STATUS_PAYLOAD_JSON='{"tool":"sessions_list","action":"json","args":{}}' \
 docker compose up --build
 ```
 
@@ -120,14 +130,14 @@ docker compose up --build
     "openclaw-gateway": {
       "command": "node",
       "args": ["/absolute/path/to/openclaw-mcp-gateway/dist/server.js"],
-      "env": {
-        "OPENCLAW_GATEWAY_URL": "http://127.0.0.1:18789",
-        "OPENCLAW_GATEWAY_TOKEN": "your-gateway-token",
-        "OPENCLAW_STATUS_PAYLOAD_JSON": "{\"tool\":\"status\",\"arguments\":{}}"
+        "env": {
+          "OPENCLAW_GATEWAY_URL": "http://127.0.0.1:18789",
+          "OPENCLAW_GATEWAY_TOKEN": "your-gateway-token",
+          "OPENCLAW_STATUS_PAYLOAD_JSON": "{\"tool\":\"sessions_list\",\"action\":\"json\",\"args\":{}}"
+        }
       }
     }
   }
-}
 ```
 
 ## Limitations
@@ -143,6 +153,8 @@ docker compose up --build
   https://github.com/openclaw/openclaw/blob/main/docs/gateway/tools-invoke-http-api.md
 - OpenClaw `/api/v1/check` reference:
   https://github.com/openclaw/openclaw/blob/main/docs/reference/rpc.md
+- OpenClaw `/tools/invoke` handler source:
+  https://github.com/openclaw/openclaw/blob/main/src/gateway/tools-invoke-http.ts
 
 ## Future extension ideas
 

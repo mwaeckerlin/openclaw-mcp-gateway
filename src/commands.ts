@@ -8,7 +8,10 @@ export type AllowedToolName =
 
 export interface GatewayInvokePayload {
   tool: string;
-  arguments?: Record<string, unknown>;
+  action?: string;
+  args?: Record<string, unknown>;
+  sessionKey?: string;
+  dryRun?: boolean;
 }
 
 interface BaseGatewayOperation {
@@ -154,19 +157,56 @@ function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayl
     throw new Error(`${envVar} must be a JSON object`);
   }
 
-  const payloadData = parsed as { tool?: unknown; arguments?: unknown };
+  const payloadData = parsed as {
+    tool?: unknown;
+    action?: unknown;
+    args?: unknown;
+    sessionKey?: unknown;
+    dryRun?: unknown;
+    [key: string]: unknown;
+  };
+
+  const allowedFields = new Set(["tool", "action", "args", "sessionKey", "dryRun"]);
+  const unexpectedField = Object.keys(payloadData).find((field) => !allowedFields.has(field));
+  if (unexpectedField) {
+    throw new Error(
+      `${envVar} contains unsupported field '${unexpectedField}' (allowed: tool, action, args, sessionKey, dryRun)`
+    );
+  }
+
   const gatewayToolName = typeof payloadData.tool === "string" ? payloadData.tool.trim() : "";
   if (!gatewayToolName) {
     throw new Error(`${envVar} must include a non-empty string field 'tool'`);
   }
 
-  if (payloadData.arguments !== undefined && !isPlainObject(payloadData.arguments)) {
-    throw new Error(`${envVar}.arguments must be a JSON object when provided`);
+  if (payloadData.action !== undefined) {
+    if (typeof payloadData.action !== "string" || !payloadData.action.trim()) {
+      throw new Error(`${envVar}.action must be a non-empty string when provided`);
+    }
+  }
+
+  if (payloadData.args !== undefined && !isPlainObject(payloadData.args)) {
+    throw new Error(`${envVar}.args must be a JSON object when provided`);
+  }
+
+  if (payloadData.sessionKey !== undefined) {
+    if (typeof payloadData.sessionKey !== "string" || !payloadData.sessionKey.trim()) {
+      throw new Error(`${envVar}.sessionKey must be a non-empty string when provided`);
+    }
+  }
+
+  if (payloadData.dryRun !== undefined && typeof payloadData.dryRun !== "boolean") {
+    throw new Error(`${envVar}.dryRun must be a boolean when provided`);
   }
 
   return {
     tool: gatewayToolName,
-    arguments: payloadData.arguments as Record<string, unknown> | undefined
+    ...(typeof payloadData.action === "string" ? { action: payloadData.action.trim() } : {}),
+    ...(isPlainObject(payloadData.args) ? { args: payloadData.args } : {}),
+    ...(typeof payloadData.sessionKey === "string"
+      ? { sessionKey: payloadData.sessionKey.trim() }
+      : {}),
+    ...(typeof payloadData.dryRun === "boolean" ? { dryRun: payloadData.dryRun } : {})
   };
 }
 
