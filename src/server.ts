@@ -138,7 +138,8 @@ async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): P
       );
     }
 
-    if (messageSuggestsNotSupported(parseGatewayErrorMessage(responseText))) {
+    const invokeMessage = parseGatewayErrorMessage(responseText);
+    if (messageSuggestsNotSupported(invokeMessage)) {
       throw new McpError(
         ErrorCode.InternalError,
         `${toolName} is not supported by the current Gateway API`

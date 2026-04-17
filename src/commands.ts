@@ -147,7 +147,9 @@ function parsePayloadJson(rawPayload: string, envVar: string): GatewayInvokePayl
 
   if (
     payload.arguments !== undefined &&
-    (!payload.arguments || typeof payload.arguments !== "object" || Array.isArray(payload.arguments))
+    (payload.arguments === null ||
+      typeof payload.arguments !== "object" ||
+      Array.isArray(payload.arguments))
   ) {
     throw new Error(`${envVar}.arguments must be a JSON object when provided`);
   }
