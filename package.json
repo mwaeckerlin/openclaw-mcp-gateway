@@ -1,0 +1,27 @@
+{
+  "name": "openclaw-mcp-gateway",
+  "version": "1.0.0",
+  "description": "MCP server to give SSH-sandboxed AI agents limited access to the OpenClaw CLI.",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
+  },
+  "keywords": [
+    "mcp",
+    "openclaw",
+    "gateway",
+    "security"
+  ],
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.17.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2"
+  }
+}

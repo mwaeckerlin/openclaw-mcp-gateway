@@ -1,0 +1,9 @@
+services:
+  openclaw-mcp-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw-mcp-gateway:local
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
