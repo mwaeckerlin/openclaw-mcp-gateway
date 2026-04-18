@@ -111,7 +111,7 @@ Exactly one of `id` or `jobId` is required:
 |---|---|---|---|
 | `id` | string | one-of | Internal job UUID |
 | `jobId` | string | one-of | Human-readable job name/id |
-| `mode` | `"due"` \| `"force"` | no | `force` ignores schedule; `due` runs only if overdue |
+| `mode` | `"due"` \| `"force"` | no | `force` ignores schedule; `due` runs only if due |
 
 > **Note:** `openclaw_cron_run` may return `enqueued: true` — the run is scheduled but not yet complete. Use `openclaw_cron_runs` to inspect the actual execution outcome.
 
