@@ -10,9 +10,9 @@ node "openclaw-gateway" as gateway
 node "openclaw-sandbox" as sandbox
 node "openclaw-mcp-gateway" as mcp
 
-gateway --> sandbox : ssh (agent executes commands)
-sandbox --> mcp    : MCP tool calls
-mcp --> gateway    : forward verified calls
+gateway --right--> sandbox : ssh (agent executes commands)
+sandbox -down-> mcp    : MCP tool calls
+mcp -up-> gateway    : forward verified calls
 @enduml
 ```
 
