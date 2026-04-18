@@ -1,4 +1,10 @@
-import { randomUUID } from "node:crypto";
+import {
+  createHash,
+  createPrivateKey,
+  generateKeyPairSync,
+  randomUUID,
+  sign as cryptoSign
+} from "node:crypto";
 import WebSocket, { RawData } from "ws";
 import { GatewayConfig } from "./commands.js";
 
@@ -41,6 +47,66 @@ interface WebSocketLike {
 }
 
 const DEFAULT_SCOPE = ["operator.admin", "operator.read"];
+
+// ---- Ed25519 device identity for connect-frame scope preservation ----
+// The gateway clears scopes to [] for token-auth clients without a valid
+// device identity. We generate a fresh ephemeral key pair per call and sign
+// the challenge nonce so the gateway keeps our requested scopes intact.
+
+const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
+
+function toBase64Url(buf: Buffer): string {
+  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+interface DeviceIdentity {
+  deviceId: string;
+  publicKeyRaw: string; // base64url raw 32-byte key
+  privateKeyPem: string;
+}
+
+function generateDeviceIdentity(): DeviceIdentity {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const spkiDer = publicKey.export({ type: "spki", format: "der" }) as Buffer;
+  const rawPublicKey = spkiDer.subarray(ED25519_SPKI_PREFIX.length);
+  const deviceId = createHash("sha256").update(rawPublicKey).digest("hex");
+  return {
+    deviceId,
+    publicKeyRaw: toBase64Url(rawPublicKey),
+    privateKeyPem: privateKey.export({ type: "pkcs8", format: "pem" }) as string
+  };
+}
+
+// Payload format matches openclaw gateway's buildDeviceAuthPayloadV3:
+// "v3|{deviceId}|{clientId}|{clientMode}|{role}|{scopes}|{signedAtMs}|{token}|{nonce}|{platform}|{deviceFamily}"
+function buildDevicePayloadV3(
+  deviceId: string,
+  scopes: string[],
+  signedAtMs: number,
+  token: string,
+  nonce: string,
+  platform: string
+): string {
+  const normalizeDeviceMeta = (v: string): string => v.trim().toLowerCase();
+  return [
+    "v3",
+    deviceId,
+    "gateway-client",
+    "backend",
+    "operator",
+    scopes.join(","),
+    String(signedAtMs),
+    token,
+    nonce,
+    normalizeDeviceMeta(platform),
+    "" // deviceFamily: unused
+  ].join("|");
+}
+
+function signDevicePayload(privateKeyPem: string, payload: string): string {
+  const key = createPrivateKey(privateKeyPem);
+  return toBase64Url(cryptoSign(null, Buffer.from(payload, "utf8"), key));
+}
 
 let webSocketFactory: WebSocketFactory = (url) => new WebSocket(url, { maxPayload: 25 * 1024 * 1024 });
 
@@ -123,6 +189,7 @@ export async function callGatewayRpc(
     let settled = false;
     let connected = false;
     let connectSent = false;
+    const deviceIdentity = generateDeviceIdentity();
 
     const stop = (error?: Error, result?: unknown): void => {
       if (settled) {
@@ -152,11 +219,35 @@ export async function callGatewayRpc(
       }
     };
 
-    const sendConnect = (): void => {
+    const sendConnect = (nonce?: string): void => {
       if (connectSent) {
         return;
       }
       connectSent = true;
+      const scopes = DEFAULT_SCOPE;
+
+      // Build device field when the gateway has given us a challenge nonce.
+      // Without a device, the gateway clears our requested scopes to [].
+      let device: Record<string, unknown> | undefined;
+      if (nonce) {
+        const signedAtMs = Date.now();
+        const payload = buildDevicePayloadV3(
+          deviceIdentity.deviceId,
+          scopes,
+          signedAtMs,
+          gatewayConfig.token,
+          nonce,
+          process.platform
+        );
+        device = {
+          id: deviceIdentity.deviceId,
+          publicKey: deviceIdentity.publicKeyRaw,
+          signature: signDevicePayload(deviceIdentity.privateKeyPem, payload),
+          signedAt: signedAtMs,
+          nonce
+        };
+      }
+
       sendFrame({
         type: "req",
         id: connectRequestId,
@@ -175,7 +266,8 @@ export async function callGatewayRpc(
             token: gatewayConfig.token
           },
           role: "operator",
-          scopes: DEFAULT_SCOPE
+          scopes,
+          ...(device !== undefined ? { device } : {})
         }
       });
     };
@@ -217,7 +309,14 @@ export async function callGatewayRpc(
 
       if (frame.type === "event") {
         if (frame.event === "connect.challenge") {
-          sendConnect();
+          const payload = frame.payload;
+          const nonce =
+            payload !== null &&
+            typeof payload === "object" &&
+            typeof (payload as Record<string, unknown>).nonce === "string"
+              ? ((payload as Record<string, unknown>).nonce as string)
+              : undefined;
+          sendConnect(nonce);
         }
         return;
       }
