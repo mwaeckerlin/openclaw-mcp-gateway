@@ -14,8 +14,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 const MCP_URL = process.env.OPENCLAW_E2E_MCP_URL;
 if (!MCP_URL) {
-  console.log("Skipping E2E tests: OPENCLAW_E2E_MCP_URL is not set");
-  process.exit(0);
+  console.error("OPENCLAW_E2E_MCP_URL is not set — run E2E tests via: cd test && docker compose up");
+  process.exit(1);
 }
 
 let passed = 0;
