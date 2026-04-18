@@ -7,6 +7,8 @@ services:
     environment:
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
       OPENCLAW_OPENAI_API_KEY: ${OPENCLAW_E2E_OPENAI_API_KEY:-test-openai-key}
+    networks:
+      - e2e
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:18789/healthz"]
       interval: 5s
@@ -18,9 +20,10 @@ services:
       context: ..
       dockerfile: Dockerfile
     image: mwaeckerlin/openclaw-mcp-gateway
-    network_mode: service:openclaw
+    networks:
+      - e2e
     environment:
-      OPENCLAW_GATEWAY_URL: http://127.0.0.1:18789
+      OPENCLAW_GATEWAY_URL: http://openclaw:18789
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
       OPENCLAW_MCP_HOST: 0.0.0.0
       OPENCLAW_MCP_PORT: 4000
@@ -28,7 +31,7 @@ services:
       openclaw:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/healthz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://mcp-gateway:4000/healthz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -37,9 +40,14 @@ services:
     build:
       context: ..
       dockerfile: test/Dockerfile
-    network_mode: service:mcp-gateway
+    networks:
+      - e2e
     environment:
-      OPENCLAW_E2E_MCP_URL: http://127.0.0.1:4000/mcp
+      OPENCLAW_E2E_MCP_URL: http://mcp-gateway:4000/mcp
     depends_on:
       mcp-gateway:
         condition: service_healthy
+
+networks:
+  e2e:
+    driver: bridge

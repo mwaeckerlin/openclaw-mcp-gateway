@@ -6,13 +6,17 @@
  * No test framework — just plain Node.js with the MCP SDK client.
  *
  * Required environment variable:
- *   OPENCLAW_E2E_MCP_URL  Base URL of the MCP gateway, e.g. http://127.0.0.1:4000/mcp
+ *   OPENCLAW_E2E_MCP_URL  Full URL of the MCP gateway endpoint, e.g. http://mcp-gateway:4000/mcp
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const MCP_URL = process.env.OPENCLAW_E2E_MCP_URL ?? "http://127.0.0.1:4000/mcp";
+const MCP_URL = process.env.OPENCLAW_E2E_MCP_URL;
+if (!MCP_URL) {
+  console.error("Fatal: OPENCLAW_E2E_MCP_URL is required");
+  process.exit(1);
+}
 
 let passed = 0;
 let failed = 0;
