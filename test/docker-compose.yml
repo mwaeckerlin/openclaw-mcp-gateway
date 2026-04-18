@@ -43,7 +43,7 @@ services:
     networks:
       - e2e
     environment:
-      OPENCLAW_E2E_MCP_URL: http://mcp-gateway:4000/mcp
+      OPENCLAW_E2E_MCP_URL: http://mcp-gateway:4000
     depends_on:
       mcp-gateway:
         condition: service_healthy

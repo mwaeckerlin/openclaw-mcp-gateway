@@ -240,7 +240,7 @@ async function handleMcpHttpRequest(
     return;
   }
 
-  if (requestUrl.pathname !== "/mcp") {
+  if (requestUrl.pathname !== "/") {
     respondJson(res, 404, { error: "not_found", message: "Unknown endpoint" });
     return;
   }
@@ -283,7 +283,7 @@ export async function main(): Promise<void> {
     httpServer.listen(port, host, () => resolve());
   });
 
-  console.error(`OpenClaw MCP Gateway listening on http://${host}:${port}/mcp`);
+  console.error(`OpenClaw MCP Gateway listening on http://${host}:${port}`);
 }
 
 const entryPoint = process.argv[1];

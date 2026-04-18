@@ -45,7 +45,7 @@ OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
 npm start
 ```
 
-The server listens on `http://<OPENCLAW_MCP_HOST>:<OPENCLAW_MCP_PORT>/mcp`.
+The server listens on `http://<OPENCLAW_MCP_HOST>:<OPENCLAW_MCP_PORT>`.
 
 ## Docker
 
@@ -95,7 +95,7 @@ Optional overrides:
 
 - `OPENCLAW_E2E_GATEWAY_TOKEN` (default: `test-gateway-token`)
 - `OPENCLAW_E2E_OPENAI_API_KEY` (default: `test-openai-key`)
-- `OPENCLAW_E2E_MCP_URL` (default: `http://mcp-gateway:4000/mcp`)
+- `OPENCLAW_E2E_MCP_URL` (default: `http://mcp-gateway:4000`)
 
 ## MCP client example (streamable HTTP)
 
@@ -104,7 +104,7 @@ Optional overrides:
   "mcpServers": {
     "openclaw-gateway": {
       "transport": "streamable-http",
-      "url": "http://127.0.0.1:4000/mcp",
+      "url": "http://127.0.0.1:4000",
       "headers": {
         "Authorization": "Bearer your-gateway-token"
       }

@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 const E2E_GATEWAY_URL = process.env.OPENCLAW_E2E_GATEWAY_URL?.trim();
 const E2E_GATEWAY_TOKEN = process.env.OPENCLAW_E2E_GATEWAY_TOKEN?.trim();
-const E2E_MCP_URL = process.env.OPENCLAW_E2E_MCP_URL?.trim() ?? "http://127.0.0.1:4000/mcp";
+const E2E_MCP_URL = process.env.OPENCLAW_E2E_MCP_URL?.trim() ?? "http://127.0.0.1:4000";
 const shouldRunE2E = Boolean(E2E_GATEWAY_URL && E2E_GATEWAY_TOKEN && E2E_MCP_URL);
 
 async function waitForGatewayReady(timeoutMs = 120_000): Promise<void> {
