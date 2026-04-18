@@ -18,6 +18,14 @@ if (!MCP_URL) {
   process.exit(1);
 }
 
+// Regex for errors that require exactly one of id/jobId but both or neither were provided.
+const ID_VALIDATION_RE = /validation|mismatch|id|jobId/i;
+
+// Cron expression used for the e2e test job (runs daily at 03:00 UTC).
+const E2E_CRON_EXPR = "0 3 * * *";
+// Placeholder job name used for update/remove/run calls (may not exist in the live gateway).
+const E2E_JOB_NAME = "e2e-test-job";
+
 let passed = 0;
 let failed = 0;
 
@@ -192,8 +200,8 @@ async function main() {
       const r = await client.callTool({
         name: "openclaw_cron_add",
         arguments: {
-          name: "e2e-test-job",
-          schedule: { kind: "cron", expr: "0 3 * * *" },
+          name: E2E_JOB_NAME,
+          schedule: { kind: "cron", expr: E2E_CRON_EXPR },
           sessionTarget: "main",
           wakeMode: "next-heartbeat",
           payload: { kind: "systemEvent", text: "e2e test run" }
@@ -249,7 +257,7 @@ async function main() {
       const r = await client.callTool({
         name: "openclaw_cron_update",
         arguments: {
-          jobId: "e2e-test-job",
+          jobId: E2E_JOB_NAME,
           patch: { enabled: false }
         }
       });
@@ -279,7 +287,7 @@ async function main() {
       });
       if (r.isError) {
         const errText = JSON.stringify(r.content);
-        if (/validation|mismatch|id|jobId/i.test(errText)) {
+        if (ID_VALIDATION_RE.test(errText)) {
           pass(`openclaw_cron_update validation → got expected error: ${errText.slice(0, 120)}`);
         } else {
           fail("openclaw_cron_update validation → unexpected error body", errText);
@@ -288,7 +296,7 @@ async function main() {
         fail("openclaw_cron_update validation → expected validation error, got success", JSON.stringify(r));
       }
     } catch (e) {
-      if (/validation|mismatch|id|jobId/i.test(e.message ?? "")) {
+      if (ID_VALIDATION_RE.test(e.message ?? "")) {
         pass(`openclaw_cron_update validation → throws expected error: ${e.message}`);
       } else {
         fail("openclaw_cron_update validation → unexpected exception", e.message);
@@ -301,7 +309,7 @@ async function main() {
     try {
       const r = await client.callTool({
         name: "openclaw_cron_remove",
-        arguments: { jobId: "e2e-test-job" }
+        arguments: { jobId: E2E_JOB_NAME }
       });
       const text = firstTextContent(r.content);
       if (text) {
@@ -329,7 +337,7 @@ async function main() {
       });
       if (r.isError) {
         const errText = JSON.stringify(r.content);
-        if (/validation|mismatch|id|jobId/i.test(errText)) {
+        if (ID_VALIDATION_RE.test(errText)) {
           pass(`openclaw_cron_remove validation → got expected error: ${errText.slice(0, 120)}`);
         } else {
           fail("openclaw_cron_remove validation → unexpected error body", errText);
@@ -338,7 +346,7 @@ async function main() {
         fail("openclaw_cron_remove validation → expected validation error, got success", JSON.stringify(r));
       }
     } catch (e) {
-      if (/validation|mismatch|id|jobId/i.test(e.message ?? "")) {
+      if (ID_VALIDATION_RE.test(e.message ?? "")) {
         pass(`openclaw_cron_remove validation → throws expected error: ${e.message}`);
       } else {
         fail("openclaw_cron_remove validation → unexpected exception", e.message);
@@ -351,7 +359,7 @@ async function main() {
     try {
       const r = await client.callTool({
         name: "openclaw_cron_run",
-        arguments: { jobId: "e2e-test-job", mode: "force" }
+        arguments: { jobId: E2E_JOB_NAME, mode: "force" }
       });
       const text = firstTextContent(r.content);
       if (text) {
@@ -379,7 +387,7 @@ async function main() {
       });
       if (r.isError) {
         const errText = JSON.stringify(r.content);
-        if (/validation|mismatch|id|jobId/i.test(errText)) {
+        if (ID_VALIDATION_RE.test(errText)) {
           pass(`openclaw_cron_run validation → got expected error: ${errText.slice(0, 120)}`);
         } else {
           fail("openclaw_cron_run validation → unexpected error body", errText);
@@ -388,7 +396,7 @@ async function main() {
         fail("openclaw_cron_run validation → expected validation error, got success", JSON.stringify(r));
       }
     } catch (e) {
-      if (/validation|mismatch|id|jobId/i.test(e.message ?? "")) {
+      if (ID_VALIDATION_RE.test(e.message ?? "")) {
         pass(`openclaw_cron_run validation → throws expected error: ${e.message}`);
       } else {
         fail("openclaw_cron_run validation → unexpected exception", e.message);
