@@ -2,6 +2,8 @@
 
 Give sandboxed SSH AI agents controlled access to [OpenClaw](https://github.com/mwaeckerlin/openclaw) through this MCP gateway service.
 
+This service integrates into [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw), a multi-agent orchestration platform that gives AI assistants real-world capabilities — browser automation, code execution, file management, API calls — inside a controlled, auditable gateway. AI agents running inside SSH-isolated or Docker-sandboxed environments cannot — and should not — reach OpenClaw directly. Instead they talk only to this lightweight MCP service, the single bridge allowed through the network boundary. The gateway enforces a hardcoded allowlist of operations: the AI agent cannot choose which HTTP endpoint is called, cannot modify the payloads sent to OpenClaw, and cannot inject arbitrary commands. This makes the overall architecture significantly more secure than any setup where the AI has direct HTTP access to OpenClaw.
+
 ## About mwaeckerlin/openclaw
 
 [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw) is a multi-agent orchestration platform that gives AI assistants real-world capabilities — browser automation, code execution, file management, API calls — inside a controlled, auditable gateway. Each session runs in its own isolated environment; agents invoke tools through a REST API and a tool invocation protocol.
