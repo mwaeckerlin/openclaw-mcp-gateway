@@ -7,11 +7,13 @@ import {
   McpError
 } from "@modelcontextprotocol/sdk/types.js";
 import {
-  ALLOWED_GATEWAY_OPERATIONS,
+  ALLOWED_HTTP_GATEWAY_OPERATIONS,
   GatewayConfig,
-  isAllowedToolName,
+  isHttpToolName,
   loadGatewayConfig
 } from "./commands.js";
+import { CRON_RPC_OPERATIONS, isCronToolName, validateCronToolArguments } from "./cron.js";
+import { callGatewayRpc, GatewayRpcError } from "./gateway-rpc.js";
 import { TOOL_DEFINITIONS } from "./tools.js";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
@@ -42,6 +44,16 @@ function formatErrorBody(bodyText: string): string {
 
   const maxLength = 500;
   return trimmed.length <= maxLength ? trimmed : `${trimmed.slice(0, maxLength)}...`;
+}
+
+function normalizeUnknownResponseBody(body: unknown): string {
+  if (body === null || body === undefined) {
+    return "(no output)";
+  }
+  if (typeof body === "string") {
+    return body.trim() ? body : "(no output)";
+  }
+  return JSON.stringify(body, null, 2);
 }
 
 function messageSuggestsNotSupported(message: string): boolean {
@@ -90,16 +102,58 @@ function isGatewayCapabilityError(status: number, details: string): boolean {
 }
 
 export async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): Promise<string> {
-  if (!isAllowedToolName(toolName)) {
+  return runAllowedToolWithArguments(toolName, {}, gatewayConfig);
+}
+
+export async function runAllowedToolWithArguments(
+  toolName: string,
+  toolArguments: unknown,
+  gatewayConfig: GatewayConfig
+): Promise<string> {
+  if (!isHttpToolName(toolName) && !isCronToolName(toolName)) {
     throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
   }
 
-  const operation = ALLOWED_GATEWAY_OPERATIONS[toolName];
+  if (isCronToolName(toolName)) {
+    const operation = CRON_RPC_OPERATIONS[toolName];
+    let params: Record<string, unknown>;
+    try {
+      params = validateCronToolArguments(toolName, toolArguments);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new McpError(ErrorCode.InvalidParams, `Validation mismatch: ${message}`);
+    }
+
+    try {
+      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs);
+      return normalizeUnknownResponseBody(payload);
+    } catch (error: unknown) {
+      if (error instanceof GatewayRpcError) {
+        if (error.kind === "capability") {
+          throw new McpError(
+            ErrorCode.InternalError,
+            `${toolName} is not supported by the current Gateway RPC capability`
+          );
+        }
+        if (error.kind === "auth") {
+          throw new McpError(ErrorCode.InternalError, `Gateway auth failure: ${error.message}`);
+        }
+        if (error.kind === "timeout") {
+          throw new McpError(ErrorCode.InternalError, `Gateway transport timeout: ${error.message}`);
+        }
+        if (error.kind === "protocol") {
+          throw new McpError(ErrorCode.InternalError, `Gateway protocol failure: ${error.message}`);
+        }
+        throw new McpError(ErrorCode.InternalError, `Gateway transport failure: ${error.message}`);
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new McpError(ErrorCode.InternalError, `Gateway request failed: ${message}`);
+    }
+  }
+
+  const operation = ALLOWED_HTTP_GATEWAY_OPERATIONS[toolName];
   const method = operation.requestKind === "check" ? "GET" : "POST";
-  const url = new URL(
-    operation.requestKind === "check" ? "/api/v1/check" : "/tools/invoke",
-    gatewayConfig.baseUrl
-  );
+  const url = new URL(operation.requestKind === "check" ? "/api/v1/check" : "/tools/invoke", gatewayConfig.baseUrl);
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), operation.timeoutMs);
 
@@ -186,11 +240,11 @@ function createMcpServer(gatewayConfig: GatewayConfig): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const toolName = request.params.name;
 
-    if (!isAllowedToolName(toolName)) {
+    if (!isHttpToolName(toolName) && !isCronToolName(toolName)) {
       throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
     }
 
-    const output = await runAllowedTool(toolName, gatewayConfig);
+    const output = await runAllowedToolWithArguments(toolName, request.params.arguments, gatewayConfig);
 
     return {
       content: [

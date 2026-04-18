@@ -90,25 +90,36 @@ async function main() {
       fail("tools/list → openclaw_gateway_status missing", `got: [${toolNames.join(", ")}]`);
     }
 
+    const requiredCronTools = [
+      "openclaw_cron_status",
+      "openclaw_cron_list",
+      "openclaw_cron_add",
+      "openclaw_cron_update",
+      "openclaw_cron_remove",
+      "openclaw_cron_run",
+      "openclaw_cron_runs"
+    ];
+    for (const tool of requiredCronTools) {
+      if (toolNames.includes(tool)) {
+        pass(`tools/list → ${tool} is present`);
+      } else {
+        fail(`tools/list → ${tool} missing`, `got: [${toolNames.join(", ")}]`);
+      }
+    }
+
     // ------------------------------------------------- openclaw_gateway_status
     // Calls GET /api/v1/check on the upstream gateway.
-    // Accept: non-empty text response OR "not supported" capability error.
+    // Must return non-empty text response.
     try {
       const r = await client.callTool({ name: "openclaw_gateway_status" });
       const text = firstTextContent(r.content);
       if (text) {
         pass(`openclaw_gateway_status → ${text.text}`);
-      } else if (r.isError && /not supported/i.test(JSON.stringify(r.content))) {
-        pass(`openclaw_gateway_status → not supported by this gateway (acceptable): ${JSON.stringify(r.content)}`);
       } else {
         fail("openclaw_gateway_status → unexpected response", JSON.stringify(r));
       }
     } catch (e) {
-      if (/not supported/i.test(e.message ?? "")) {
-        pass(`openclaw_gateway_status → not supported by this gateway (acceptable): ${e.message}`);
-      } else {
-        fail("openclaw_gateway_status → unexpected error", e.message);
-      }
+      fail("openclaw_gateway_status → unexpected error", e.message);
     }
 
     // ------------------------------------------------------- openclaw_status

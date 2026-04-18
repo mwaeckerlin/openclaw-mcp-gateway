@@ -154,7 +154,7 @@ function readOptionalInteger(
 ): number | undefined {
   const raw = value[key];
   if (raw === undefined) return undefined;
-  if (!Number.isInteger(raw)) {
+  if (typeof raw !== "number" || !Number.isInteger(raw)) {
     throw new Error(`${path}.${key} must be an integer`);
   }
   if (minimum !== undefined && raw < minimum) {
@@ -856,29 +856,6 @@ const cronStatePatchSchema = {
   additionalProperties: false
 } as const;
 
-const idOrJobIdObjectSchema = (extraProperties: Record<string, unknown> = {}, extraRequired: string[] = []) => ({
-  oneOf: [
-    {
-      type: "object",
-      properties: {
-        id: nonEmptyStringSchema,
-        ...extraProperties
-      },
-      required: ["id", ...extraRequired],
-      additionalProperties: false
-    },
-    {
-      type: "object",
-      properties: {
-        jobId: nonEmptyStringSchema,
-        ...extraProperties
-      },
-      required: ["jobId", ...extraRequired],
-      additionalProperties: false
-    }
-  ]
-});
-
 export const CRON_TOOL_INPUT_SCHEMAS: Record<
   CronToolName,
   {
@@ -927,48 +904,53 @@ export const CRON_TOOL_INPUT_SCHEMAS: Record<
     additionalProperties: false
   },
   openclaw_cron_update: {
-    ...idOrJobIdObjectSchema(
-      {
-        patch: {
-          type: "object",
-          properties: {
-            name: nonEmptyStringSchema,
-            description: stringSchema,
-            enabled: boolSchema,
-            deleteAfterRun: boolSchema,
-            agentId: { anyOf: [nonEmptyStringSchema, { type: "null" }] },
-            sessionKey: { anyOf: [nonEmptyStringSchema, { type: "null" }] },
-            schedule: scheduleSchema,
-            sessionTarget: {
-              anyOf: [{ enum: ["main", "isolated", "current"] }, { type: "string", pattern: "^session:.+" }]
-            },
-            wakeMode: { enum: ["next-heartbeat", "now"] },
-            payload: payloadPatchSchema,
-            delivery: deliveryPatchSchema,
-            failureAlert: failureAlertSchema,
-            state: cronStatePatchSchema
-          },
-          additionalProperties: false
-        }
-      },
-      ["patch"]
-    ),
     type: "object",
-    properties: {},
+    properties: {
+      id: nonEmptyStringSchema,
+      jobId: nonEmptyStringSchema,
+      patch: {
+        type: "object",
+        properties: {
+          name: nonEmptyStringSchema,
+          description: stringSchema,
+          enabled: boolSchema,
+          deleteAfterRun: boolSchema,
+          agentId: { anyOf: [nonEmptyStringSchema, { type: "null" }] },
+          sessionKey: { anyOf: [nonEmptyStringSchema, { type: "null" }] },
+          schedule: scheduleSchema,
+          sessionTarget: {
+            anyOf: [{ enum: ["main", "isolated", "current"] }, { type: "string", pattern: "^session:.+" }]
+          },
+          wakeMode: { enum: ["next-heartbeat", "now"] },
+          payload: payloadPatchSchema,
+          delivery: deliveryPatchSchema,
+          failureAlert: failureAlertSchema,
+          state: cronStatePatchSchema
+        },
+        additionalProperties: false
+      }
+    },
+    required: ["patch"],
+    oneOf: [{ required: ["id"] }, { required: ["jobId"] }],
     additionalProperties: false
   },
   openclaw_cron_remove: {
-    ...idOrJobIdObjectSchema(),
     type: "object",
-    properties: {},
+    properties: {
+      id: nonEmptyStringSchema,
+      jobId: nonEmptyStringSchema
+    },
+    oneOf: [{ required: ["id"] }, { required: ["jobId"] }],
     additionalProperties: false
   },
   openclaw_cron_run: {
-    ...idOrJobIdObjectSchema({
-      mode: { enum: ["due", "force"] }
-    }),
     type: "object",
-    properties: {},
+    properties: {
+      id: nonEmptyStringSchema,
+      jobId: nonEmptyStringSchema,
+      mode: { enum: ["due", "force"] }
+    },
+    oneOf: [{ required: ["id"] }, { required: ["jobId"] }],
     additionalProperties: false
   },
   openclaw_cron_runs: {

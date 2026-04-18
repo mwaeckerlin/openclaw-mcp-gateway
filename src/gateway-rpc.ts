@@ -29,9 +29,16 @@ interface RpcResponseFrame {
 }
 
 type WebSocketFactory = (url: string) => Pick<
-  WebSocket,
+  WebSocketLike,
   "on" | "send" | "close" | "readyState"
 >;
+
+interface WebSocketLike {
+  on(event: string, listener: (...args: any[]) => void): unknown;
+  send(data: string): void;
+  close(): void;
+  readyState: number;
+}
 
 const DEFAULT_SCOPE = ["operator.admin"];
 
@@ -218,7 +225,7 @@ export async function callGatewayRpc(
         return;
       }
 
-      const response = frame as RpcResponseFrame;
+      const response = frame as unknown as RpcResponseFrame;
       if (response.id === connectRequestId) {
         if (response.ok !== true) {
           stop(toGatewayRpcError(response, "Gateway connect"));

@@ -106,6 +106,13 @@ test(
       const toolNames = new Set(tools.tools.map((tool) => tool.name));
       assert.ok(toolNames.has("openclaw_status"));
       assert.ok(toolNames.has("openclaw_gateway_status"));
+      assert.ok(toolNames.has("openclaw_cron_status"));
+      assert.ok(toolNames.has("openclaw_cron_list"));
+      assert.ok(toolNames.has("openclaw_cron_add"));
+      assert.ok(toolNames.has("openclaw_cron_update"));
+      assert.ok(toolNames.has("openclaw_cron_remove"));
+      assert.ok(toolNames.has("openclaw_cron_run"));
+      assert.ok(toolNames.has("openclaw_cron_runs"));
 
       const statusResult = await client.callTool({
         name: "openclaw_status"
@@ -115,22 +122,13 @@ test(
       assert.ok(statusTextOutput);
       assert.ok(statusTextOutput.text.trim().length > 0);
 
-      let gatewayStatusHandled = false;
-      try {
-        const gatewayStatusResult = await client.callTool({
-          name: "openclaw_gateway_status"
-        });
-        assert.ok(Array.isArray(gatewayStatusResult.content));
-        const gatewayStatusTextOutput = gatewayStatusResult.content.find(isTextContent);
-        assert.ok(gatewayStatusTextOutput);
-        assert.ok(gatewayStatusTextOutput.text.trim().length > 0);
-        gatewayStatusHandled = true;
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        assert.match(message, /not supported/i);
-        gatewayStatusHandled = true;
-      }
-      assert.equal(gatewayStatusHandled, true);
+      const gatewayStatusResult = await client.callTool({
+        name: "openclaw_gateway_status"
+      });
+      assert.ok(Array.isArray(gatewayStatusResult.content));
+      const gatewayStatusTextOutput = gatewayStatusResult.content.find(isTextContent);
+      assert.ok(gatewayStatusTextOutput);
+      assert.ok(gatewayStatusTextOutput.text.trim().length > 0);
 
       try {
         const unknownToolResult = await client.callTool({

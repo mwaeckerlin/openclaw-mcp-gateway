@@ -2,7 +2,7 @@
 
 Give sandboxed SSH AI agents controlled access to [OpenClaw](https://github.com/mwaeckerlin/openclaw) through this MCP gateway service.
 
-AI agents running inside SSH-isolated and Docker-sandboxed environments cannot — and should not — reach OpenClaw directly, i.e. they have no access to the OpenClaw CLI. The AI agent in the SSH sandbox could access directly to the gateway, if it had the gateway token. But it would be a security risk to expose the gateway token to the AI agent. Instead it talks only to this lightweight MCP service. The gateway enforces a hardcoded allowlist of operations: the AI agent cannot choose which HTTP endpoint is called, cannot modify the payloads sent to OpenClaw, and cannot inject arbitrary commands. This makes the overall architecture significantly more secure than any setup where the AI has direct HTTP access to OpenClaw.
+AI agents running inside SSH-isolated and Docker-sandboxed environments cannot — and should not — reach OpenClaw directly, i.e. they have no access to the OpenClaw CLI. The AI agent in the SSH sandbox could access directly to the gateway, if it had the gateway token. But it would be a security risk to expose the gateway token to the AI agent. Instead it talks only to this lightweight MCP service. The gateway enforces a hardcoded allowlist of operations: the AI agent cannot choose arbitrary Gateway methods, cannot bypass local schema validation for allowlisted tools, and cannot inject arbitrary commands. This makes the overall architecture significantly more secure than any setup where the AI has direct HTTP/WebSocket access to OpenClaw.
 
 [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw) runs an OpenClaw Gateway and an SSH Sandbox in two isolated docker containers, so that the AI agent has absolutely no access to any secret or token or the gateway and it's configuration.
 
@@ -30,11 +30,18 @@ mcp -up-> gateway    : forward verified calls
 
 ## MCP Tools
 
-| MCP Tool | Method | OpenClaw Endpoint | Description |
+| MCP Tool | Transport | Gateway Method/Endpoint | Description |
 |---|---|---|---|
-| `tools/list` | `GET` | (no) | Lists all available MCP tools |
-| `openclaw_status` | `POST` | `/tools/invoke` (tool: `sessions_list`) | Lists active OpenClaw sessions |
-| `openclaw_gateway_status` | `POST` | `/api/v1/check` | Checks OpenClaw gateway health |
+| `tools/list` | MCP | (no) | Lists all available MCP tools |
+| `openclaw_status` | HTTP | `POST /tools/invoke` (tool: `sessions_list`) | Lists active OpenClaw sessions |
+| `openclaw_gateway_status` | HTTP | `GET /api/v1/check` | Checks OpenClaw gateway health |
+| `openclaw_cron_status` | WebSocket RPC | `cron.status` | Returns cron scheduler status |
+| `openclaw_cron_list` | WebSocket RPC | `cron.list` | Lists jobs with paging/filter/sort |
+| `openclaw_cron_add` | WebSocket RPC | `cron.add` | Creates cron jobs (`at`, `every`, `cron`) with full payload/delivery options |
+| `openclaw_cron_update` | WebSocket RPC | `cron.update` | Patches jobs via `id` or `jobId` |
+| `openclaw_cron_remove` | WebSocket RPC | `cron.remove` | Removes jobs via `id` or `jobId` |
+| `openclaw_cron_run` | WebSocket RPC | `cron.run` | Triggers a job (may only enqueue) |
+| `openclaw_cron_runs` | WebSocket RPC | `cron.runs` | Inspects actual run outcomes/history |
 
 ## Security
 
@@ -44,7 +51,7 @@ This service provides three independent layers of security. You do not have to t
 The AI agent runs inside a Docker container or SSH-isolated environment. That environment should not bear any token. Only the OpenClawGateway and the MCP server holds the OpenClaw gateway token. Even if the AI is manipulated or "jailbroken", it cannot contact the OpenClaw gateway, because it has no token.
 
 **2. Fixed-allowlist MCP gateway — the AI agent cannot choose what it sends.**
-Every MCP tool call is mapped to a single, hardcoded OpenClaw operation defined at build time. There is no dynamic endpoint selection, no user-controlled payload fields, no shell execution, and no eval. The AI cannot escalate a `tools/list` or `openclaw_status` call into an arbitrary HTTP request. The MCP gateway is the only component with network access to OpenClaw, and it acts as a strict one-way firewall.
+Every MCP tool call is mapped to a single, hardcoded OpenClaw operation defined at build time. There is no generic passthrough, no dynamic method selection beyond explicit tool names, no shell execution, and no eval. Cron tools accept structured arguments but reject unknown top-level fields and validate supported shapes locally before forwarding to Gateway RPC. The AI cannot escalate a `tools/list` or `openclaw_status` call into arbitrary Gateway access. The MCP gateway is the only component with network access to OpenClaw, and it acts as a strict one-way firewall.
 
 **3. Hardened container image — the runtime has the smallest possible attack surface.**
 The production image is built on [`mwaeckerlin/nodejs`](https://github.com/mwaeckerlin/nodejs), a purpose-built, minimal Node.js base image. It runs as a non-root user, contains no shell or package manager, and ships only the files required to execute the application. The total image size is only **91.8 MB**. There is nothing inside the container that an attacker could use to escalate privileges or pivot to other systems.
@@ -63,6 +70,35 @@ The production image is built on [`mwaeckerlin/nodejs`](https://github.com/mwaec
 | `OPENCLAW_MCP_PORT` | no | Port to listen on (default: `4000`) |
 
 \* One of `OPENCLAW_GATEWAY_TOKEN` or `OPENCLAW_GATEWAY_KEY` is required. In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
+
+Cron MCP tools use Gateway WebSocket RPC on the same Gateway base URL (`OPENCLAW_GATEWAY_URL`), converted internally from `http(s)` to `ws(s)`.
+
+## OpenClaw SKILL for this project
+
+This repository ships an OpenClaw skill at:
+
+- `skills/openclaw-mcp-gateway/SKILL.md`
+
+OpenClaw skills are authored as a `SKILL.md` file with YAML frontmatter (`name`, `description`) plus markdown body instructions; OpenClaw discovers skills from the workspace skills directory:
+
+- `~/.openclaw/workspace/skills/<skill-name>/SKILL.md`
+
+### Deploy this skill locally
+
+```bash
+mkdir -p ~/.openclaw/workspace/skills/openclaw-mcp-gateway
+cp skills/openclaw-mcp-gateway/SKILL.md ~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md
+openclaw skills list
+openclaw skills detail openclaw-mcp-gateway
+```
+
+### Use this skill
+
+- Ask OpenClaw for tasks related to MCP gateway setup, cron tool usage, or gateway troubleshooting.
+- The skill guides:
+  - configuration and health checks
+  - cron tool semantics (`openclaw_cron_run` enqueue vs `openclaw_cron_runs` final status)
+  - common auth/transport/protocol/validation error handling
 
 ## Local Development
 
@@ -100,7 +136,7 @@ tc -> gw : GET /healthz
 gw --> tc : 200 OK
 
 tc -> gw : MCP tools/list
-gw --> tc : [openclaw_status, openclaw_gateway_status]
+gw --> tc : [openclaw_status, openclaw_gateway_status, openclaw_cron_*]
 
 tc -> gw : MCP call openclaw_gateway_status
 gw -> oc : GET /api/v1/check
@@ -142,4 +178,3 @@ Optional overrides:
   }
 }
 ```
-
