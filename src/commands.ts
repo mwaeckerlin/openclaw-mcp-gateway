@@ -150,7 +150,7 @@ function readSecret(
   }
 
   const inlineHint = legacyInlineEnvVar ? `${inlineEnvVar} or ${legacyInlineEnvVar}` : inlineEnvVar;
-  const fileHint = legacyFileEnvVar ?? fileEnvVar;
+  const fileHint = legacyFileEnvVar ?? fileEnvVar ?? "";
   throw new Error(`Set ${inlineHint}${fileHint ? ` or ${fileHint}` : ""}`);
 }
 
