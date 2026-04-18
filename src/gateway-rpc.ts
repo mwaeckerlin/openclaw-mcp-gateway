@@ -93,8 +93,8 @@ function isAuthErrorText(text: string): boolean {
     normalized.includes("password") ||
     normalized.includes("forbidden") ||
     normalized.includes("unauthorized") ||
-    normalized.includes("scope") ||
-    normalized.includes("permission")
+    normalized.includes("missing scope") ||
+    normalized.includes("permission denied")
   );
 }
 

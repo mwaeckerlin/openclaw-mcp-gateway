@@ -255,6 +255,11 @@ function createMcpServer(gatewayConfig: GatewayConfig): Server {
         ]
       };
     } catch (error: unknown) {
+      // Validation errors (InvalidParams) propagate as MCP protocol errors so
+      // the client can distinguish them from gateway-level failures. All other
+      // errors (gateway capability, auth, timeout, protocol) are returned as
+      // tool isError responses so the caller receives structured error content
+      // rather than a raw MCP exception.
       if (error instanceof McpError && error.code === ErrorCode.InvalidParams) {
         throw error;
       }
