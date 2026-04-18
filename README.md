@@ -2,23 +2,31 @@
 
 Give sandboxed SSH AI agents controlled access to [OpenClaw](https://github.com/mwaeckerlin/openclaw) through this MCP gateway service.
 
-AI agents running inside SSH-isolated and Docker-sandboxed environments cannot — and should not — reach OpenClaw directly. Instead they talk only to this lightweight MCP service, the single bridge allowed through the network boundary. The gateway enforces a hardcoded allowlist of operations: the AI agent cannot choose which HTTP endpoint is called, cannot modify the payloads sent to OpenClaw, and cannot inject arbitrary commands. This makes the overall architecture significantly more secure than any setup where the AI has direct HTTP access to OpenClaw.
+AI agents running inside SSH-isolated and Docker-sandboxed environments cannot — and should not — reach OpenClaw directly, i.e. they have no access to the OpenClaw CLI. The AI agent in the SSH sandbox could access directly to the gateway, if it had the gateway token. But it would be a security risk to expose the gateway token to the AI agent. Instead it talks only to this lightweight MCP service. The gateway enforces a hardcoded allowlist of operations: the AI agent cannot choose which HTTP endpoint is called, cannot modify the payloads sent to OpenClaw, and cannot inject arbitrary commands. This makes the overall architecture significantly more secure than any setup where the AI has direct HTTP access to OpenClaw.
+
+[mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw) runs an OpenClaw Gateway and an SSH Sandbox in two isolated docker containers, so that the AI agent has absolutely no access to any secret or token or the gateway and it's configuration.
+
+Typically, this server runs in such an enviroenment, where the nodes are typically docker containers in a docker swarm or in kubernetes pods, but could also be just virtual machines:
 
 ```plantuml
 @startuml
-node "openclaw-gateway" as gateway
-node "openclaw-sandbox" as sandbox
-node "openclaw-mcp-gateway" as mcp
+node "mwaeckerlin/openclaw:gateway" {
+  [OpenClaw-Gateway] as gateway
+}
+node "mwaeckerlin/openclaw:sandbox" {
+  [SSH-Sandbox] as sandbox
+}
+node "mwaeckerlin/openclaw-mcp-gateway" {
+  [OpenClaw-MCP-Gateway] as mcp
+}
 
 gateway --right--> sandbox : ssh (agent executes commands)
 sandbox -down-> mcp    : MCP tool calls
 mcp -up-> gateway    : forward verified calls
+:AI-Agent: .down.> sandbox
 @enduml
 ```
 
-## About mwaeckerlin/openclaw
-
-[mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw) is a multi-agent orchestration platform that gives AI assistants real-world capabilities — browser automation, code execution, file management, API calls — inside a controlled, auditable gateway. Each session runs in its own isolated environment; agents invoke tools through a REST API and a tool invocation protocol.
 
 ## MCP Tools
 
@@ -33,7 +41,7 @@ mcp -up-> gateway    : forward verified calls
 This service provides three independent layers of security. You do not have to trust any single layer — all three must be bypassed simultaneously to compromise the system.
 
 **1. Sandbox isolation — the AI agent cannot reach OpenClaw or the internet directly.**
-The AI agent runs inside a Docker container or SSH-isolated environment. Its only allowed outbound connection is to this MCP gateway on one port. Even if the AI is manipulated or "jailbroken", it cannot contact OpenClaw, the host system, or any other network resource.
+The AI agent runs inside a Docker container or SSH-isolated environment. That environment should not bear any token. Only the OpenClawGateway and the MCP server holds the OpenClaw gateway token. Even if the AI is manipulated or "jailbroken", it cannot contact the OpenClaw gateway, because it has no token.
 
 **2. Fixed-allowlist MCP gateway — the AI agent cannot choose what it sends.**
 Every MCP tool call is mapped to a single, hardcoded OpenClaw operation defined at build time. There is no dynamic endpoint selection, no user-controlled payload fields, no shell execution, and no eval. The AI cannot escalate a `tools/list` or `openclaw_status` call into an arbitrary HTTP request. The MCP gateway is the only component with network access to OpenClaw, and it acts as a strict one-way firewall.
