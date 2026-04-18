@@ -43,7 +43,209 @@ mcp -up-> gateway    : forward verified calls
 | `openclaw_cron_run` | WebSocket RPC | `cron.run` | Triggers a job (may only enqueue) |
 | `openclaw_cron_runs` | WebSocket RPC | `cron.runs` | Inspects actual run outcomes/history |
 
-## Security
+## Tool Parameter Reference
+
+### `openclaw_status` / `openclaw_gateway_status`
+
+No parameters.
+
+### `openclaw_cron_status`
+
+No parameters. Returns cron scheduler status.
+
+### `openclaw_cron_list`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `limit` | integer 1–200 | Max jobs to return |
+| `offset` | integer ≥0 | Pagination offset |
+| `query` | string | Filter by name/description |
+| `enabled` | `"all"` \| `"enabled"` \| `"disabled"` | Filter by enabled state |
+| `includeDisabled` | boolean | Include disabled jobs |
+| `sortBy` | `"nextRunAtMs"` \| `"updatedAtMs"` \| `"name"` | Sort field |
+| `sortDir` | `"asc"` \| `"desc"` | Sort direction |
+
+### `openclaw_cron_add`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | **yes** | Job name |
+| `schedule` | object | **yes** | Schedule — see [Schedule](#schedule) |
+| `sessionTarget` | string | **yes** | `"main"` \| `"isolated"` \| `"current"` \| `"session:<id>"` |
+| `wakeMode` | string | **yes** | `"now"` \| `"next-heartbeat"` |
+| `payload` | object | **yes** | What to deliver — see [Payload](#payload) |
+| `description` | string | no | Human-readable description |
+| `enabled` | boolean | no | Start enabled (default true) |
+| `deleteAfterRun` | boolean | no | Remove job after first successful run |
+| `agentId` | string \| null | no | Target agent override |
+| `sessionKey` | string \| null | no | Session key override |
+| `delivery` | object | no | How to notify — see [Delivery](#delivery) |
+| `failureAlert` | `false` \| object | no | Alert after repeated failures — see [FailureAlert](#failurealert) |
+
+### `openclaw_cron_update`
+
+Exactly one of `id` or `jobId` is required, plus `patch`:
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | one-of | Internal job UUID |
+| `jobId` | string | one-of | Human-readable job name/id |
+| `patch` | object | **yes** | Fields to update (all optional, same fields as `openclaw_cron_add` plus `state` — see [State Patch](#state-patch)) |
+
+### `openclaw_cron_remove`
+
+Exactly one of `id` or `jobId` is required:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `id` | string | Internal job UUID |
+| `jobId` | string | Human-readable job name/id |
+
+### `openclaw_cron_run`
+
+Exactly one of `id` or `jobId` is required:
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | one-of | Internal job UUID |
+| `jobId` | string | one-of | Human-readable job name/id |
+| `mode` | `"due"` \| `"force"` | no | `force` ignores schedule; `due` runs only if overdue |
+
+> **Note:** `openclaw_cron_run` may return `enqueued: true` — the run is scheduled but not yet complete. Use `openclaw_cron_runs` to inspect the actual execution outcome.
+
+### `openclaw_cron_runs`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `scope` | `"job"` \| `"all"` | Scope to a specific job or all jobs |
+| `id` | string | Filter by internal job UUID |
+| `jobId` | string | Filter by human-readable job name/id |
+| `limit` | integer 1–200 | Max runs to return |
+| `offset` | integer ≥0 | Pagination offset |
+| `statuses` | string[] (1–3) | One or more of `"ok"`, `"error"`, `"skipped"` |
+| `status` | `"all"` \| `"ok"` \| `"error"` \| `"skipped"` | Single-value status filter |
+| `deliveryStatuses` | string[] (1–4) | One or more delivery status values |
+| `deliveryStatus` | `"delivered"` \| `"not-delivered"` \| `"unknown"` \| `"not-requested"` | Single-value delivery filter |
+| `query` | string | Text filter |
+| `sortDir` | `"asc"` \| `"desc"` | Sort direction |
+
+---
+
+### Schedule
+
+One of three kinds:
+
+```jsonc
+// Run once at a specific time (ISO 8601)
+{ "kind": "at", "at": "2026-06-01T10:00:00+00:00" }
+
+// Repeat every N milliseconds
+{ "kind": "every", "everyMs": 3600000, "anchorMs": 0 }
+
+// Cron expression
+{ "kind": "cron", "expr": "0 9 * * 1-5", "tz": "Europe/Berlin", "staggerMs": 0 }
+```
+
+| Field | Type | Required for | Description |
+|---|---|---|---|
+| `kind` | `"at"` \| `"every"` \| `"cron"` | all | Schedule type |
+| `at` | string (ISO 8601) | `at` | Run-once timestamp |
+| `everyMs` | integer ≥1 | `every` | Interval in milliseconds |
+| `anchorMs` | integer ≥0 | `every` | Epoch anchor offset in ms |
+| `expr` | string | `cron` | Cron expression |
+| `tz` | string | `cron` | IANA timezone (default: UTC) |
+| `staggerMs` | integer ≥0 | `cron` | Random jitter up to N ms |
+
+### Payload
+
+One of two kinds:
+
+```jsonc
+// System event
+{ "kind": "systemEvent", "text": "run nightly check" }
+
+// Agent turn (trigger an AI agent)
+{
+  "kind": "agentTurn",
+  "message": "perform nightly analysis",
+  "model": "gpt-4o",
+  "fallbacks": ["gpt-4"],
+  "toolsAllow": ["search"],
+  "timeoutSeconds": 300
+}
+```
+
+| Field | Type | Required for | Description |
+|---|---|---|---|
+| `kind` | `"systemEvent"` \| `"agentTurn"` | all | Payload type |
+| `text` | string | `systemEvent` | Event text |
+| `message` | string | `agentTurn` | Prompt for the agent |
+| `model` | string | — | Model override |
+| `fallbacks` | string[] | — | Fallback model list |
+| `thinking` | string | — | Thinking mode hint |
+| `timeoutSeconds` | number ≥0 | — | Agent turn timeout in seconds |
+| `allowUnsafeExternalContent` | boolean | — | Allow fetching external content |
+| `lightContext` | boolean | — | Use minimal context window |
+| `toolsAllow` | string[] | — | Allowed tool names for this turn |
+
+### Delivery
+
+```jsonc
+{ "mode": "none" }
+{ "mode": "announce", "channel": "last" }
+{ "mode": "webhook", "to": "https://hooks.example.com/notify" }
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `mode` | `"none"` \| `"announce"` \| `"webhook"` | **yes** (on add) | Delivery mode |
+| `to` | string | **yes** for `webhook` | Webhook URL |
+| `channel` | `"last"` \| string | no | Channel name; `"last"` = most recent channel |
+| `accountId` | string | no | Account ID override |
+| `bestEffort` | boolean | no | Do not fail job on delivery error |
+| `failureDestination` | object | no | Alternative delivery on job failure: `{ channel?, to?, accountId?, mode? }` |
+
+### FailureAlert
+
+```jsonc
+false                                            // disable
+{ "after": 3, "channel": "last", "cooldownMs": 3600000 }
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `after` | integer ≥1 | Consecutive failures before alerting |
+| `channel` | `"last"` \| string | Alert channel |
+| `to` | string | Alert webhook or destination |
+| `cooldownMs` | integer ≥0 | Minimum ms between repeated alerts |
+| `mode` | `"announce"` \| `"webhook"` | Alert delivery mode |
+| `accountId` | string | Account ID for alert |
+
+### State Patch
+
+Available only inside `openclaw_cron_update`'s `patch.state`. Used to manually correct job runtime state:
+
+| Field | Type | Description |
+|---|---|---|
+| `nextRunAtMs` | integer ≥0 | Override next scheduled run (epoch ms) |
+| `runningAtMs` | integer ≥0 | Mark as currently running since (epoch ms) |
+| `lastRunAtMs` | integer ≥0 | Override last run timestamp (epoch ms) |
+| `lastRunStatus` | `"ok"` \| `"error"` \| `"skipped"` | Override last run status |
+| `lastStatus` | `"ok"` \| `"error"` \| `"skipped"` | Override overall job status |
+| `lastError` | string | Last error message |
+| `lastErrorReason` | `"auth"` \| `"format"` \| `"rate_limit"` \| `"billing"` \| `"timeout"` \| `"model_not_found"` \| `"unknown"` | Structured error code |
+| `lastDurationMs` | integer ≥0 | Last run duration in ms |
+| `consecutiveErrors` | integer ≥0 | Override consecutive error counter |
+| `lastDelivered` | boolean | Override delivery success flag |
+| `lastDeliveryStatus` | `"delivered"` \| `"not-delivered"` \| `"unknown"` \| `"not-requested"` | Override delivery status |
+| `lastDeliveryError` | string | Last delivery error message |
+| `lastFailureAlertAtMs` | integer ≥0 | Last failure alert timestamp (epoch ms) |
+
+
 
 This service provides three independent layers of security. You do not have to trust any single layer — all three must be bypassed simultaneously to compromise the system.
 
@@ -77,7 +279,7 @@ Cron MCP tools use Gateway WebSocket RPC on the same Gateway base URL (`OPENCLAW
 
 This repository ships an OpenClaw skill at:
 
-- `skills/openclaw-mcp-gateway/SKILL.md`
+- `SKILL.md` (root directory)
 
 OpenClaw skills are authored as a `SKILL.md` file with YAML frontmatter (`name`, `description`) plus markdown body instructions; OpenClaw discovers skills from the workspace skills directory:
 
@@ -87,7 +289,7 @@ OpenClaw skills are authored as a `SKILL.md` file with YAML frontmatter (`name`,
 
 ```bash
 mkdir -p ~/.openclaw/workspace/skills/openclaw-mcp-gateway
-cp skills/openclaw-mcp-gateway/SKILL.md ~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md
+cp SKILL.md ~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md
 openclaw skills list
 openclaw skills detail openclaw-mcp-gateway
 ```
