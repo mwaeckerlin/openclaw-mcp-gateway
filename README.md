@@ -68,8 +68,9 @@ The production image is built on [`mwaeckerlin/nodejs`](https://github.com/mwaec
 
 ```bash
 npm install
-npm run build   # compiles TypeScript and builds the Docker image
-npm test        # runs unit tests, then E2E tests inside Docker Compose
+npm run build         # compiles TypeScript to dist/
+npm run build:docker  # builds the Docker image
+npm test              # runs unit tests, then E2E tests inside Docker Compose
 ```
 
 ## Running
