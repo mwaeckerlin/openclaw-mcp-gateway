@@ -14,8 +14,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 const MCP_URL = process.env.OPENCLAW_E2E_MCP_URL;
 if (!MCP_URL) {
-  console.error("Fatal: OPENCLAW_E2E_MCP_URL is required");
-  process.exit(1);
+  console.log("Skipping E2E tests: OPENCLAW_E2E_MCP_URL is not set");
+  process.exit(0);
 }
 
 let passed = 0;
@@ -34,19 +34,19 @@ function fail(name, detail = "") {
 async function waitForHealthz(baseUrl, timeoutMs = 120_000) {
   const healthzUrl = new URL("/healthz", baseUrl).href;
   const deadline = Date.now() + timeoutMs;
-  process.stderr.write(`Waiting for ${healthzUrl}`);
+  process.stdout.write(`Waiting for ${healthzUrl}`);
   while (Date.now() < deadline) {
     try {
       const r = await fetch(healthzUrl);
       if (r.ok) {
-        process.stderr.write(" ready\n");
+        process.stdout.write(" ready\n");
         return;
       }
     } catch {
       // not ready yet
     }
     await new Promise((resolve) => setTimeout(resolve, 1_000));
-    process.stderr.write(".");
+    process.stdout.write(".");
   }
   throw new Error(`Timed out: ${healthzUrl} not ready after ${timeoutMs}ms`);
 }
@@ -97,15 +97,15 @@ async function main() {
       const r = await client.callTool({ name: "openclaw_gateway_status" });
       const text = firstTextContent(r.content);
       if (text) {
-        pass("openclaw_gateway_status → returned non-empty text");
+        pass(`openclaw_gateway_status → ${text.text}`);
       } else if (r.isError && /not supported/i.test(JSON.stringify(r.content))) {
-        pass("openclaw_gateway_status → not supported by this gateway (acceptable)");
+        pass(`openclaw_gateway_status → not supported by this gateway (acceptable): ${JSON.stringify(r.content)}`);
       } else {
         fail("openclaw_gateway_status → unexpected response", JSON.stringify(r));
       }
     } catch (e) {
       if (/not supported/i.test(e.message ?? "")) {
-        pass("openclaw_gateway_status → not supported by this gateway (acceptable)");
+        pass(`openclaw_gateway_status → not supported by this gateway (acceptable): ${e.message}`);
       } else {
         fail("openclaw_gateway_status → unexpected error", e.message);
       }
@@ -119,10 +119,10 @@ async function main() {
       const r = await client.callTool({ name: "openclaw_status" });
       const text = firstTextContent(r.content);
       if (text) {
-        pass("openclaw_status → returned non-empty text");
+        pass(`openclaw_status → ${text.text}`);
       } else if (r.isError) {
         // Gateway returned an error, but the MCP layer handled it correctly.
-        pass("openclaw_status → gateway returned error, MCP layer handled it correctly");
+        pass(`openclaw_status → gateway returned error, MCP layer handled it correctly: ${JSON.stringify(r.content)}`);
       } else {
         fail("openclaw_status → unexpected response", JSON.stringify(r));
       }
@@ -135,13 +135,13 @@ async function main() {
     try {
       const r = await client.callTool({ name: "unknown_tool_xyz" });
       if (r.isError || /unknown|error|invalid/i.test(JSON.stringify(r))) {
-        pass("unknown tool → returns error response");
+        pass(`unknown tool → got expected error response: ${JSON.stringify(r.content)}`);
       } else {
         fail("unknown tool → expected error response", JSON.stringify(r));
       }
     } catch (e) {
       if (/unknown|error|invalid/i.test(e.message ?? "")) {
-        pass("unknown tool → throws expected error");
+        pass(`unknown tool → throws expected error: ${e.message}`);
       } else {
         fail("unknown tool → unexpected exception", e.message);
       }

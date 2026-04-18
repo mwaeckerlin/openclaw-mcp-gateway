@@ -100,7 +100,7 @@ function validateGatewayToken(token: string): string {
 
 function readSecret(
   inlineEnvVar: string,
-  fileEnvVar: string,
+  fileEnvVar: string | undefined,
   legacyInlineEnvVar?: string,
   legacyFileEnvVar?: string,
   defaultFilePath?: string
@@ -117,14 +117,16 @@ function readSecret(
     }
   }
 
-  const filePath = process.env[fileEnvVar]?.trim();
-  if (filePath) {
-    const validatedPath = validateFilePath(filePath, fileEnvVar);
-    const fileValue = readFileSync(validatedPath, "utf8").trim();
-    if (fileValue) {
-      return validateGatewayToken(fileValue);
+  if (fileEnvVar) {
+    const filePath = process.env[fileEnvVar]?.trim();
+    if (filePath) {
+      const validatedPath = validateFilePath(filePath, fileEnvVar);
+      const fileValue = readFileSync(validatedPath, "utf8").trim();
+      if (fileValue) {
+        return validateGatewayToken(fileValue);
+      }
+      throw new Error(`${fileEnvVar} is empty`);
     }
-    throw new Error(`${fileEnvVar} is empty`);
   }
 
   if (legacyFileEnvVar) {
@@ -148,8 +150,8 @@ function readSecret(
   }
 
   const inlineHint = legacyInlineEnvVar ? `${inlineEnvVar} or ${legacyInlineEnvVar}` : inlineEnvVar;
-  const fileHint = legacyFileEnvVar ? `${fileEnvVar} or ${legacyFileEnvVar}` : fileEnvVar;
-  throw new Error(`Set ${inlineHint} or ${fileHint}`);
+  const fileHint = legacyFileEnvVar ?? fileEnvVar;
+  throw new Error(`Set ${inlineHint}${fileHint ? ` or ${fileHint}` : ""}`);
 }
 
 export function loadGatewayConfig(): GatewayConfig {
@@ -162,7 +164,7 @@ export function loadGatewayConfig(): GatewayConfig {
     baseUrl: normalizeUrl(baseUrlEnv),
     token: readSecret(
       "OPENCLAW_GATEWAY_TOKEN",
-      "OPENCLAW_GATEWAY_TOKEN_FILE",
+      undefined,
       "OPENCLAW_GATEWAY_KEY",
       "OPENCLAW_GATEWAY_KEY_FILE",
       "/run/secret/openclaw_gateway_token"
