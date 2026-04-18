@@ -163,7 +163,7 @@ export async function callGatewayRpc(
           minProtocol: 3,
           maxProtocol: 3,
           client: {
-            id: "openclaw-mcp-gateway",
+            id: "gateway-client",
             version: "1.0.0",
             platform: process.platform,
             mode: "backend"
