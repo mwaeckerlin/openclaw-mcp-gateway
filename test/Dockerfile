@@ -1,13 +1,9 @@
-FROM mwaeckerlin/nodejs-build
-USER root
-
-WORKDIR /workspace
-ENV NODE_EXTRA_CA_CERTS=""
+FROM node:22-alpine
+WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --omit=dev
 
-COPY tsconfig.json ./
-COPY src ./src
+COPY test/e2e.mjs ./
 
-CMD ["npm", "run", "test"]
+CMD ["node", "e2e.mjs"]
