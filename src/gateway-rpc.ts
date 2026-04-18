@@ -92,7 +92,9 @@ function isAuthErrorText(text: string): boolean {
     normalized.includes("token") ||
     normalized.includes("password") ||
     normalized.includes("forbidden") ||
-    normalized.includes("unauthorized")
+    normalized.includes("unauthorized") ||
+    normalized.includes("scope") ||
+    normalized.includes("permission")
   );
 }
 

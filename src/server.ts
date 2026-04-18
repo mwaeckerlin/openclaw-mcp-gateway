@@ -244,16 +244,36 @@ function createMcpServer(gatewayConfig: GatewayConfig): Server {
       throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
     }
 
-    const output = await runAllowedToolWithArguments(toolName, request.params.arguments, gatewayConfig);
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: output
-        }
-      ]
-    };
+    try {
+      const output = await runAllowedToolWithArguments(toolName, request.params.arguments, gatewayConfig);
+      return {
+        content: [
+          {
+            type: "text",
+            text: output
+          }
+        ]
+      };
+    } catch (error: unknown) {
+      if (error instanceof McpError && error.code === ErrorCode.InvalidParams) {
+        throw error;
+      }
+      const message =
+        error instanceof McpError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: message
+          }
+        ]
+      };
+    }
   });
 
   return server;
