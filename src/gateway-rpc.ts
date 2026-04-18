@@ -40,7 +40,7 @@ interface WebSocketLike {
   readyState: number;
 }
 
-const DEFAULT_SCOPE = ["operator.admin"];
+const DEFAULT_SCOPE = ["operator.admin", "operator.read"];
 
 let webSocketFactory: WebSocketFactory = (url) => new WebSocket(url, { maxPayload: 25 * 1024 * 1024 });
 
