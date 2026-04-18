@@ -1,0 +1,12 @@
+services:
+  openclaw-mcp-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mwaeckerlin/openclaw-mcp-gateway
+    environment:
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://localhost:18789}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-test-gateway-token}
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
