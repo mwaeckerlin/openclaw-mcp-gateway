@@ -5,8 +5,7 @@ import { ALLOWED_GATEWAY_OPERATIONS, loadGatewayConfig } from "./commands.js";
 const ENV_KEYS = [
   "OPENCLAW_GATEWAY_URL",
   "OPENCLAW_GATEWAY_TOKEN",
-  "OPENCLAW_GATEWAY_KEY",
-  "OPENCLAW_GATEWAY_KEY_FILE"
+  "OPENCLAW_GATEWAY_KEY"
 ] as const;
 
 function withEnv(env: Partial<Record<(typeof ENV_KEYS)[number], string>>, run: () => void): void {

@@ -5,9 +5,9 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && docker compose build",
     "test": "tsx --test src/commands.test.ts src/server.integration.test.ts && (cd test && docker compose up --build --force-recreate --remove-orphans --abort-on-container-exit --exit-code-from test-client)",
-    "start": "node dist/server.js",
+    "start": "docker compose up --build --force-recreate --remove-orphans",
     "dev": "tsx src/server.ts"
   },
   "keywords": [

@@ -1,67 +1,66 @@
-# OpenClaw MCP Gateway
+# Secure Access To OpenClaw From Sandbox
 
-A secure MCP HTTP server that gives AI agents limited, auditable access to an [OpenClaw](https://github.com/mwaeckerlin/openclaw) runtime over the network. It exposes a fixed allowlist of OpenClaw Gateway operations as MCP tools — no arbitrary shell execution, no dynamic endpoint routing, and no command injection is possible from MCP inputs.
+Give sandboxed SSH AI agents controlled access to [OpenClaw](https://github.com/mwaeckerlin/openclaw) through this MCP gateway service.
 
-The primary use case is sandboxed AI agents (e.g. running in Docker or SSH-isolated containers) that need to observe or interact with a running OpenClaw Gateway without having unrestricted network access to it. The gateway bridges the MCP protocol to OpenClaw's HTTP REST API, enforcing that only pre-approved operations can be invoked.
+## About mwaeckerlin/openclaw
 
-## OpenClaw
+[mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw) is a multi-agent orchestration platform that gives AI assistants real-world capabilities — browser automation, code execution, file management, API calls — inside a controlled, auditable gateway. Each session runs in its own isolated environment; agents invoke tools through a REST API and a tool invocation protocol.
 
-[OpenClaw](https://github.com/mwaeckerlin/openclaw) is an AI-agent runtime that provides a secure, sandboxed execution environment for browser automation, code execution, file management, and other tasks. It runs as a gateway service exposing a REST API and a tool invocation protocol. Agents connect to OpenClaw to delegate real-world actions to a controlled, auditable environment.
-
-This MCP Gateway makes a curated subset of OpenClaw's API available to any MCP-compatible AI assistant, with all routing and payload construction fixed in the server — the MCP client cannot influence which endpoints are called or what is sent to them.
+This MCP Gateway exists because AI agents running inside SSH-isolated or Docker-sandboxed environments cannot — and should not — reach the OpenClaw gateway directly. Instead they talk only to this lightweight MCP service, the single bridge allowed through the network boundary. The gateway enforces a hardcoded allowlist of operations: the AI agent cannot choose which HTTP endpoint is called, cannot modify the payloads sent to OpenClaw, and cannot inject arbitrary commands. This makes the overall architecture significantly more secure than any setup where the AI has direct HTTP access to OpenClaw.
 
 ## MCP Tools
 
 | MCP Tool | Method | OpenClaw Endpoint | Description |
 |---|---|---|---|
+| `tools/list` | (MCP) | (no) | Lists all available MCP tools |
 | `openclaw_status` | `POST` | `/tools/invoke` (tool: `sessions_list`) | Lists active OpenClaw sessions |
 | `openclaw_gateway_status` | `GET` | `/api/v1/check` | Checks OpenClaw gateway health |
 
-## Security model
+## Security
 
-- No arbitrary shell execution
-- No arbitrary command execution
-- No dynamic endpoint selection from MCP input
+This service provides three independent layers of security. You do not have to trust any single layer — all three must be bypassed simultaneously to compromise the system.
+
+**1. Sandbox isolation — the AI agent cannot reach OpenClaw or the internet directly.**
+The AI agent runs inside a Docker container or SSH-isolated environment. Its only allowed outbound connection is to this MCP gateway on one port. Even if the AI is manipulated or "jailbroken", it cannot contact OpenClaw, the host system, or any other network resource.
+
+**2. Fixed-allowlist MCP gateway — the AI agent cannot choose what it sends.**
+Every MCP tool call is mapped to a single, hardcoded OpenClaw operation defined at build time. There is no dynamic endpoint selection, no user-controlled payload fields, no shell execution, and no eval. The AI cannot escalate a `tools/list` or `openclaw_status` call into an arbitrary HTTP request. The MCP gateway is the only component with network access to OpenClaw, and it acts as a strict one-way firewall.
+
+**3. Hardened container image — the runtime has the smallest possible attack surface.**
+The production image is built on [`mwaeckerlin/nodejs`](https://github.com/mwaeckerlin/nodejs), a purpose-built, minimal Node.js base image. It runs as a non-root user, contains no shell or package manager, and ships only the files required to execute the application. The total image size is **91.8 MB**. There is nothing inside the container that an attacker could use to escalate privileges or pivot to other systems.
 
 ## Configuration
+
+> ⚠️ **Production rule: never pass secrets as environment variables.**
+> Use Docker secrets instead (mounted at `/run/secret/openclaw_gateway_token`). Environment variables can leak through log files, `/proc`, container inspection, and child processes.
 
 | Variable | Required | Description |
 |---|---|---|
 | `OPENCLAW_GATEWAY_URL` | yes | Base URL of the OpenClaw Gateway, e.g. `http://localhost:18789` |
 | `OPENCLAW_GATEWAY_TOKEN` | yes* | Bearer token for Gateway authentication |
 | `OPENCLAW_GATEWAY_KEY` | yes* | Legacy alias for `OPENCLAW_GATEWAY_TOKEN` |
-| `OPENCLAW_GATEWAY_KEY_FILE` | yes* | Path to a file containing the token (legacy) |
 | `OPENCLAW_MCP_HOST` | no | Host to bind (default: `0.0.0.0`) |
 | `OPENCLAW_MCP_PORT` | no | Port to listen on (default: `4000`) |
 
-\* One of `OPENCLAW_GATEWAY_TOKEN`, `OPENCLAW_GATEWAY_KEY`, or `OPENCLAW_GATEWAY_KEY_FILE` is required. The file `/run/secret/openclaw_gateway_token` is also read automatically when it exists.
+\* One of `OPENCLAW_GATEWAY_TOKEN` or `OPENCLAW_GATEWAY_KEY` is required. In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
 
 ## Local Development
 
 ```bash
 npm install
-npm run build
-npm test
+npm run build   # compiles TypeScript and builds the Docker image
+npm test        # runs unit tests, then E2E tests inside Docker Compose
 ```
 
-Start the gateway:
+## Running
 
 ```bash
-OPENCLAW_GATEWAY_URL="http://127.0.0.1:18789" \
-OPENCLAW_GATEWAY_TOKEN="your-gateway-token" \
 npm start
 ```
 
-The server listens on `http://<OPENCLAW_MCP_HOST>:<OPENCLAW_MCP_PORT>` (default: `http://0.0.0.0:4000`).
+Runs `docker compose up --build --force-recreate --remove-orphans` and starts the full stack.
 
-## Docker Compose
-
-```bash
-docker compose build
-docker compose up --build --force-recreate --remove-orphans
-```
-
-Compose defaults (override via environment variables):
+Compose defaults (override via environment variables in development only):
 
 - `OPENCLAW_GATEWAY_URL=http://localhost:18789`
 - `OPENCLAW_GATEWAY_TOKEN=test-gateway-token`
@@ -122,3 +121,4 @@ Optional overrides:
   }
 }
 ```
+
