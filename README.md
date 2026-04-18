@@ -39,7 +39,7 @@ The AI agent runs inside a Docker container or SSH-isolated environment. Its onl
 Every MCP tool call is mapped to a single, hardcoded OpenClaw operation defined at build time. There is no dynamic endpoint selection, no user-controlled payload fields, no shell execution, and no eval. The AI cannot escalate a `tools/list` or `openclaw_status` call into an arbitrary HTTP request. The MCP gateway is the only component with network access to OpenClaw, and it acts as a strict one-way firewall.
 
 **3. Hardened container image — the runtime has the smallest possible attack surface.**
-The production image is built on [`mwaeckerlin/nodejs`](https://github.com/mwaeckerlin/nodejs), a purpose-built, minimal Node.js base image. It runs as a non-root user, contains no shell or package manager, and ships only the files required to execute the application. The total image size is **91.8 MB**. There is nothing inside the container that an attacker could use to escalate privileges or pivot to other systems.
+The production image is built on [`mwaeckerlin/nodejs`](https://github.com/mwaeckerlin/nodejs), a purpose-built, minimal Node.js base image. It runs as a non-root user, contains no shell or package manager, and ships only the files required to execute the application. The total image size is only **91.8 MB**. There is nothing inside the container that an attacker could use to escalate privileges or pivot to other systems.
 
 ## Configuration
 
