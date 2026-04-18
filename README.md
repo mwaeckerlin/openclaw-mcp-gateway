@@ -24,7 +24,7 @@ mcp --> gateway    : forward verified calls
 
 | MCP Tool | Method | OpenClaw Endpoint | Description |
 |---|---|---|---|
-| `tools/list` | (MCP) | (no) | Lists all available MCP tools |
+| `tools/list` | `GET` | (no) | Lists all available MCP tools |
 | `openclaw_status` | `POST` | `/tools/invoke` (tool: `sessions_list`) | Lists active OpenClaw sessions |
 | `openclaw_gateway_status` | `GET` | `/api/v1/check` | Checks OpenClaw gateway health |
 
