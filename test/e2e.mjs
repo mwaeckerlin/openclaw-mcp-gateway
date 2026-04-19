@@ -6,15 +6,15 @@
  * No test framework — just plain Node.js with the MCP SDK client.
  *
  * Required environment variable:
- *   OPENCLAW_E2E_MCP_URL  Full URL of the MCP gateway endpoint, e.g. http://mcp-gateway:4000
+ *   OPENCLAW_MCP_GATEWAY_URL  Full URL of the MCP gateway endpoint, e.g. http://mcp-gateway:4000
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const MCP_URL = process.env.OPENCLAW_E2E_MCP_URL;
+const MCP_URL = process.env.OPENCLAW_MCP_GATEWAY_URL;
 if (!MCP_URL) {
-  console.error("OPENCLAW_E2E_MCP_URL is not set — run E2E tests via: cd test && docker compose up");
+  console.error("OPENCLAW_MCP_GATEWAY_URL is not set — run E2E tests via: cd test && docker compose up");
   process.exit(1);
 }
 
@@ -645,9 +645,9 @@ async function main() {
       await client.callTool({
         name: "openclaw_cron_remove",
         arguments: { id: createdJobId }
-      }).catch(() => {});
+      }).catch(() => { });
     }
-    await client.close().catch(() => {});
+    await client.close().catch(() => { });
   }
 
   // ------------------------------------------------------------------ summary

@@ -67,7 +67,7 @@ services:
     networks:
       - mcp-gateway-test-client
     environment:
-      OPENCLAW_E2E_MCP_URL: http://mcp-gateway:4000
+      OPENCLAW_MCP_GATEWAY_URL: http://mcp-gateway:4000
     depends_on:
       mcp-gateway:
         condition: service_healthy

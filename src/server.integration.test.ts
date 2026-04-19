@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 const E2E_GATEWAY_URL = process.env.OPENCLAW_E2E_GATEWAY_URL?.trim();
 const E2E_GATEWAY_TOKEN = process.env.OPENCLAW_E2E_GATEWAY_TOKEN?.trim();
-const E2E_MCP_URL = process.env.OPENCLAW_E2E_MCP_URL?.trim() ?? "http://127.0.0.1:4000";
+const E2E_MCP_URL = process.env.OPENCLAW_MCP_GATEWAY_URL?.trim() ?? '';
 const shouldRunE2E = Boolean(E2E_GATEWAY_URL && E2E_GATEWAY_TOKEN && E2E_MCP_URL);
 
 async function waitForGatewayReady(timeoutMs = 120_000): Promise<void> {
@@ -91,7 +91,7 @@ test(
     skip:
       shouldRunE2E ?
         false
-      : "Set OPENCLAW_E2E_GATEWAY_URL, OPENCLAW_E2E_GATEWAY_TOKEN, and OPENCLAW_E2E_MCP_URL to run live Gateway integration tests"
+        : "Set OPENCLAW_E2E_GATEWAY_URL, OPENCLAW_E2E_GATEWAY_TOKEN, and OPENCLAW_MCP_GATEWAY_URL to run live Gateway integration tests"
   },
   async () => {
     await waitForMcpGatewayReady();

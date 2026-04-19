@@ -62,6 +62,7 @@ mcp -up-> gateway    : forward verified calls
 | `OPENCLAW_GATEWAY_KEY` | no | Deprecated alias for `OPENCLAW_GATEWAY_TOKEN` |
 | `OPENCLAW_MCP_HOST` | no | Host to bind (default: `0.0.0.0`) |
 | `OPENCLAW_MCP_PORT` | no | Port to listen on (default: `4000`) |
+| `OPENCLAW_MCP_GATEWAY_URL` | yes | URL where MCP clients (e.g. sandbox agents) reach this gateway. Set this as an environment variable on the **client side** (sandbox container), not on the MCP gateway itself. |
 | `OPENCLAW_DEVICE_IDENTITY` | no | JSON-encoded `DeviceIdentity` object (overrides `OPENCLAW_DEVICE_FILE`) |
 | `OPENCLAW_DEVICE_FILE` | no | Path to the persistent device identity file (default: `/run/openclaw/device.json`) |
 | `DISABLE_TOOLS` | no | Disable specific MCP tools by exact name (comma and/or whitespace separated) |
@@ -110,6 +111,7 @@ Use **two separate bridge (or overlay) networks**:
 ### MCP client configuration vs tool-call parameters
 
 - **MCP client configuration** (for example `OPENCLAW_GATEWAY_URL`, auth token, `DISABLE_TOOLS`) controls how the gateway process itself is started and what tools are exposed.
+- **MCP client environment**: The sandbox/client container needs `OPENCLAW_MCP_GATEWAY_URL` set so the agent knows where to reach this MCP gateway. In [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw)'s `docker-compose.yml`, this is pre-configured on the sandbox service and written to `/etc/environment` so SSH sessions inherit it automatically.
 - **Tool-call parameters** are the validated per-call `arguments` sent by MCP clients when invoking a tool.
 - Tool-call parameters cannot override disabled tools or bypass the allowlist/validation logic.
 
