@@ -6,16 +6,20 @@ AI agents running inside SSH-isolated and Docker-sandboxed environments cannot â
 
 [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw) runs an OpenClaw Gateway and an SSH Sandbox in two isolated docker containers, so that the AI agent has absolutely no access to any secret or token or the gateway and its configuration.
 
-## Implemented Features
+## Exposed MCP Tools
 
-Allows the SSH sandboxed AI agent to:
- - **`openclaw cron`:** manage `cron` and `at` jobs,set up jobs to be execuded once or frequently at a specific time.  
+Allows the SSH-sandboxed AI agent to:
+ - **`openclaw_gateway_status`:** check whether the OpenClaw Gateway is reachable and healthy.
+ - **`openclaw_status`:** list active OpenClaw sessions.
+ - **`openclaw_cron_status` / `openclaw_cron_list`:** inspect the cron scheduler and its jobs.
+ - **`openclaw_cron_add` / `openclaw_cron_update` / `openclaw_cron_remove`:** manage `cron` and `at` jobs â€” set up jobs to be executed once or repeatedly at a specific time.  
    For example, instruct your agent:
-   > "send me a daily wther report from my location **every day at 8am** in telegram chat"
+   > "Send me a daily weather report from my location **every day at 8 am** in Telegram chat."
+ - **`openclaw_cron_run` / `openclaw_cron_runs`:** trigger a job on demand and inspect its execution history.
 
 ## Intended Deployment Context
 
-Typically, this server runs in such an environement, where the nodes are typically docker containers in a docker swarm or in kubernetes pods, but could also be just virtual machines:
+Typically, this server runs in such an environment, where the nodes are typically Docker containers in a Docker Swarm or Kubernetes pods, but could also be just virtual machines:
 
 ```plantuml
 @startuml
@@ -66,7 +70,7 @@ OpenClaw skills are authored as a `SKILL.md` file with YAML frontmatter (`name`,
 ### Deploy this skill
 
 *The easiest way* to install this skill is to upload the file `SKILL.md` or paste its content to your agent's chat, then **instruct your agent:**
-> Install this skill for me a local OpenClaw skill in `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
+> Install this skill as a local OpenClaw skill in `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
 
 Or you may copy the skill file *manually* to the right position, if you have access:
 
@@ -91,7 +95,7 @@ openclaw skills detail openclaw-mcp-gateway
 |---|---|---|---|
 | `tools/list` | MCP | (no) | Lists all available MCP tools |
 | `openclaw_status` | HTTP | `POST /tools/invoke` (tool: `sessions_list`) | Lists active OpenClaw sessions |
-| `openclaw_gateway_status` | HTTP | `GET /api/v1/check` | Checks OpenClaw gateway health |
+| `openclaw_gateway_status` | HTTP | `GET /healthz` | Checks OpenClaw gateway health |
 | `openclaw_cron_status` | WebSocket RPC | `cron.status` | Returns cron scheduler status |
 | `openclaw_cron_list` | WebSocket RPC | `cron.list` | Lists jobs with paging/filter/sort |
 | `openclaw_cron_add` | WebSocket RPC | `cron.add` | Creates cron jobs (`at`, `every`, `cron`) with full payload/delivery options |
@@ -343,7 +347,7 @@ It tells the client:
 
 ## Development
 
-There is an e2e test case in `test` that runs in a docker compose environment and simulates a real world setup. The package is not intended to be started outside of docker (even though this is possible,it is not the targeted use case).
+There is an e2e test case in `test` that runs in a Docker Compose environment and simulates a real-world setup. The package is not intended to be started outside of Docker (even though this is possible, it is not the targeted use case).
 
 Checkout `package.json`:
 

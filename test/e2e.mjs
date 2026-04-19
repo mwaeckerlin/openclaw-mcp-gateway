@@ -111,19 +111,26 @@ async function main() {
     }
 
     // ------------------------------------------------- openclaw_gateway_status
-    // POSITIVE: Tool must return a non-error status response from the upstream gateway.
+    // POSITIVE: Tool must return a healthy status response from the upstream gateway health check.
     try {
       const r = await client.callTool({ name: "openclaw_gateway_status" });
       if (r.isError) {
         fail("openclaw_gateway_status → expected success, got error", JSON.stringify(r.content));
       } else {
         const text = firstTextContent(r.content);
-        if (text && !/MCP error/i.test(text.text)) {
-          pass(`openclaw_gateway_status → ${text.text}`);
-        } else if (text) {
-          fail("openclaw_gateway_status → tool returned error text", text.text);
-        } else {
+        if (!text) {
           fail("openclaw_gateway_status → no text content in response", JSON.stringify(r));
+        } else {
+          try {
+            const parsed = JSON.parse(text.text);
+            if (parsed.ok === true && typeof parsed.status === "string") {
+              pass(`openclaw_gateway_status → ok=${parsed.ok} status=${parsed.status}`);
+            } else {
+              fail("openclaw_gateway_status → missing expected fields ok/status", text.text.slice(0, 200));
+            }
+          } catch {
+            fail("openclaw_gateway_status → response is not valid JSON", text.text.slice(0, 200));
+          }
         }
       }
     } catch (e) {
@@ -136,10 +143,19 @@ async function main() {
       const r = await client.callTool({ name: "openclaw_status" });
       if (!r.isError) {
         const text = firstTextContent(r.content);
-        if (text) {
-          pass(`openclaw_status → ${text.text}`);
-        } else {
+        if (!text) {
           fail("openclaw_status → no text content", JSON.stringify(r));
+        } else {
+          try {
+            const parsed = JSON.parse(text.text);
+            if (Array.isArray(parsed.sessions) && typeof parsed.count === "number") {
+              pass(`openclaw_status → count=${parsed.count} sessions=${JSON.stringify(parsed.sessions)}`);
+            } else {
+              fail("openclaw_status → missing expected fields sessions/count", text.text.slice(0, 200));
+            }
+          } catch {
+            fail("openclaw_status → response is not valid JSON", text.text.slice(0, 200));
+          }
         }
       } else {
         fail("openclaw_status → expected success, got error", JSON.stringify(r.content));
@@ -154,10 +170,23 @@ async function main() {
       const r = await client.callTool({ name: "openclaw_cron_status" });
       if (!r.isError) {
         const text = firstTextContent(r.content);
-        if (text) {
-          pass(`openclaw_cron_status → ${text.text.slice(0, 120)}`);
-        } else {
+        if (!text) {
           fail("openclaw_cron_status → no text content", JSON.stringify(r));
+        } else {
+          try {
+            const parsed = JSON.parse(text.text);
+            if (
+              typeof parsed.enabled === "boolean" &&
+              typeof parsed.storePath === "string" &&
+              typeof parsed.jobs === "number"
+            ) {
+              pass(`openclaw_cron_status → ${text.text.slice(0, 120)}`);
+            } else {
+              fail("openclaw_cron_status → missing expected fields enabled/storePath/jobs", text.text.slice(0, 200));
+            }
+          } catch {
+            fail("openclaw_cron_status → response is not valid JSON", text.text.slice(0, 200));
+          }
         }
       } else {
         fail("openclaw_cron_status → expected success, got error", JSON.stringify(r.content));
@@ -172,10 +201,25 @@ async function main() {
       const r = await client.callTool({ name: "openclaw_cron_list" });
       if (!r.isError) {
         const text = firstTextContent(r.content);
-        if (text) {
-          pass(`openclaw_cron_list → ${text.text.slice(0, 120)}`);
-        } else {
+        if (!text) {
           fail("openclaw_cron_list → no text content", JSON.stringify(r));
+        } else {
+          try {
+            const parsed = JSON.parse(text.text);
+            if (
+              Array.isArray(parsed.jobs) &&
+              typeof parsed.total === "number" &&
+              typeof parsed.offset === "number" &&
+              typeof parsed.limit === "number" &&
+              typeof parsed.hasMore === "boolean"
+            ) {
+              pass(`openclaw_cron_list → ${text.text.slice(0, 120)}`);
+            } else {
+              fail("openclaw_cron_list → missing expected fields jobs/total/offset/limit/hasMore", text.text.slice(0, 200));
+            }
+          } catch {
+            fail("openclaw_cron_list → response is not valid JSON", text.text.slice(0, 200));
+          }
         }
       } else {
         fail("openclaw_cron_list → expected success, got error", JSON.stringify(r.content));
@@ -253,10 +297,19 @@ async function main() {
         });
         if (!r.isError) {
           const text = firstTextContent(r.content);
-          if (text) {
-            pass(`openclaw_cron_update → ${text.text.slice(0, 120)}`);
-          } else {
+          if (!text) {
             fail("openclaw_cron_update → no text content", JSON.stringify(r));
+          } else {
+            try {
+              const parsed = JSON.parse(text.text);
+              if (parsed.id === createdJobId && parsed.enabled === false) {
+                pass(`openclaw_cron_update → ${text.text.slice(0, 120)}`);
+              } else {
+                fail("openclaw_cron_update → unexpected update result", text.text.slice(0, 200));
+              }
+            } catch {
+              fail("openclaw_cron_update → response is not valid JSON", text.text.slice(0, 200));
+            }
           }
         } else {
           fail("openclaw_cron_update → expected success, got error", JSON.stringify(r.content));
@@ -302,10 +355,19 @@ async function main() {
         });
         if (!r.isError) {
           const text = firstTextContent(r.content);
-          if (text) {
-            pass(`openclaw_cron_run → ${text.text.slice(0, 120)}`);
-          } else {
+          if (!text) {
             fail("openclaw_cron_run → no text content", JSON.stringify(r));
+          } else {
+            try {
+              const parsed = JSON.parse(text.text);
+              if (parsed.ok === true && typeof parsed.runId === "string") {
+                pass(`openclaw_cron_run → ${text.text.slice(0, 120)}`);
+              } else {
+                fail("openclaw_cron_run → missing expected fields ok/runId", text.text.slice(0, 200));
+              }
+            } catch {
+              fail("openclaw_cron_run → response is not valid JSON", text.text.slice(0, 200));
+            }
           }
         } else {
           fail("openclaw_cron_run → expected success, got error", JSON.stringify(r.content));
@@ -346,10 +408,19 @@ async function main() {
       const r = await client.callTool({ name: "openclaw_cron_runs" });
       if (!r.isError) {
         const text = firstTextContent(r.content);
-        if (text) {
-          pass(`openclaw_cron_runs → ${text.text.slice(0, 120)}`);
-        } else {
+        if (!text) {
           fail("openclaw_cron_runs → no text content", JSON.stringify(r));
+        } else {
+          try {
+            const parsed = JSON.parse(text.text);
+            if (Array.isArray(parsed.entries)) {
+              pass(`openclaw_cron_runs → ${text.text.slice(0, 120)}`);
+            } else {
+              fail("openclaw_cron_runs → missing expected field entries", text.text.slice(0, 200));
+            }
+          } catch {
+            fail("openclaw_cron_runs → response is not valid JSON", text.text.slice(0, 200));
+          }
         }
       } else {
         fail("openclaw_cron_runs → expected success, got error", JSON.stringify(r.content));
@@ -370,11 +441,20 @@ async function main() {
         });
         if (!r.isError) {
           const text = firstTextContent(r.content);
-          if (text) {
-            pass(`openclaw_cron_remove → ${text.text.slice(0, 120)}`);
-            createdJobId = null; // successfully removed; no cleanup needed
-          } else {
+          if (!text) {
             fail("openclaw_cron_remove → no text content", JSON.stringify(r));
+          } else {
+            try {
+              const parsed = JSON.parse(text.text);
+              if (parsed.ok === true && parsed.removed === true) {
+                pass(`openclaw_cron_remove → ${text.text.slice(0, 120)}`);
+                createdJobId = null; // successfully removed; no cleanup needed
+              } else {
+                fail("openclaw_cron_remove → missing expected fields ok/removed", text.text.slice(0, 200));
+              }
+            } catch {
+              fail("openclaw_cron_remove → response is not valid JSON", text.text.slice(0, 200));
+            }
           }
         } else {
           fail("openclaw_cron_remove → expected success, got error", JSON.stringify(r.content));

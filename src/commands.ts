@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { CronToolName } from "./cron.js";
+import { CronToolName, isCronToolName } from "./cron.js";
 
 export type HttpToolName =
   | "openclaw_status"
@@ -63,7 +63,7 @@ export const ALLOWED_HTTP_GATEWAY_OPERATIONS: Record<HttpToolName, AllowedGatewa
 };
 
 export function isAllowedToolName(value: string): value is AllowedToolName {
-  return isHttpToolName(value);
+  return isHttpToolName(value) || isCronToolName(value);
 }
 
 export function isHttpToolName(value: string): value is HttpToolName {

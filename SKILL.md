@@ -38,7 +38,7 @@ No parameters. Lists active OpenClaw sessions (calls `POST /tools/invoke` with `
 
 ### `openclaw_gateway_status`
 
-No parameters. Checks gateway health (calls `GET /api/v1/check`).
+No parameters. Checks gateway health (calls `GET /healthz`).
 
 ### `openclaw_cron_status`
 
