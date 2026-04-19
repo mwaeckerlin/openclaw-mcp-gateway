@@ -117,17 +117,23 @@ async function main() {
 
     // ------------------------------------------------- openclaw_gateway_status
     // Calls GET /api/v1/check on the upstream gateway.
-    // Must return non-empty text response.
+    // Must return non-empty text response that is not an MCP error.
     try {
       const r = await client.callTool({ name: "openclaw_gateway_status" });
-      const text = firstTextContent(r.content);
-      if (text) {
-        pass(`openclaw_gateway_status → ${text.text}`);
+      if (r.isError) {
+        fail("openclaw_gateway_status → expected success, got error", JSON.stringify(r.content));
       } else {
-        fail("openclaw_gateway_status → unexpected response", JSON.stringify(r));
+        const text = firstTextContent(r.content);
+        if (text && !/MCP error/i.test(text.text)) {
+          pass(`openclaw_gateway_status → ${text.text}`);
+        } else if (text) {
+          fail("openclaw_gateway_status → tool returned error text", text.text);
+        } else {
+          fail("openclaw_gateway_status → unexpected response", JSON.stringify(r));
+        }
       }
     } catch (e) {
-      fail("openclaw_gateway_status → unexpected error", e.message);
+      fail("openclaw_gateway_status → unexpected exception", e.message);
     }
 
     // ------------------------------------------------------- openclaw_status
