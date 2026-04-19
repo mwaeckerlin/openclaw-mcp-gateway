@@ -59,12 +59,12 @@ mcp -up-> gateway    : forward verified calls
 |---|---|---|
 | `OPENCLAW_GATEWAY_URL` | no | Base URL of the OpenClaw Gateway (default: `http://openclaw:18789`) |
 | `OPENCLAW_GATEWAY_TOKEN` | yes* | Bearer token for Gateway authentication |
-| `OPENCLAW_GATEWAY_KEY` | yes* | Legacy alias for `OPENCLAW_GATEWAY_TOKEN` |
+| `OPENCLAW_GATEWAY_KEY` | no | Deprecated alias for `OPENCLAW_GATEWAY_TOKEN` |
 | `OPENCLAW_MCP_HOST` | no | Host to bind (default: `0.0.0.0`) |
 | `OPENCLAW_MCP_PORT` | no | Port to listen on (default: `4000`) |
 | `DISABLE_TOOLS` | no | Disable specific MCP tools by exact name (comma and/or whitespace separated) |
 
-\* One of `OPENCLAW_GATEWAY_TOKEN` or `OPENCLAW_GATEWAY_KEY` is required. In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
+\* In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
 
 Cron MCP tools use Gateway WebSocket RPC on the same Gateway base URL (`OPENCLAW_GATEWAY_URL`), converted internally from `http(s)` to `ws(s)`.
 
