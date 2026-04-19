@@ -1,16 +1,17 @@
 import {
-  createHash,
   createPrivateKey,
-  generateKeyPairSync,
   randomUUID,
   sign as cryptoSign
 } from "node:crypto";
 import WebSocket, { RawData } from "ws";
 import { GatewayConfig } from "./commands.js";
+import { DeviceIdentity, generateDeviceIdentity } from "./device-identity.js";
+
+export type { DeviceIdentity };
 
 type GatewayRpcFrame = Record<string, unknown>;
 
-type GatewayRpcErrorKind = "capability" | "auth" | "timeout" | "transport" | "protocol";
+type GatewayRpcErrorKind = "capability" | "auth" | "timeout" | "transport" | "protocol" | "pairing";
 
 export class GatewayRpcError extends Error {
   constructor(
@@ -48,35 +49,6 @@ interface WebSocketLike {
 
 const DEFAULT_SCOPE = ["operator.admin", "operator.read"];
 
-// ---- Ed25519 device identity for connect-frame scope preservation ----
-// The gateway clears scopes to [] for token-auth clients without a valid
-// device identity. We generate a fresh ephemeral key pair per call and sign
-// the challenge nonce so the gateway keeps our requested scopes intact.
-
-const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
-
-function toBase64Url(buf: Buffer): string {
-  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-interface DeviceIdentity {
-  deviceId: string;
-  publicKeyRaw: string; // base64url raw 32-byte key
-  privateKeyPem: string;
-}
-
-function generateDeviceIdentity(): DeviceIdentity {
-  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
-  const spkiDer = publicKey.export({ type: "spki", format: "der" }) as Buffer;
-  const rawPublicKey = spkiDer.subarray(ED25519_SPKI_PREFIX.length);
-  const deviceId = createHash("sha256").update(rawPublicKey).digest("hex");
-  return {
-    deviceId,
-    publicKeyRaw: toBase64Url(rawPublicKey),
-    privateKeyPem: privateKey.export({ type: "pkcs8", format: "pem" }) as string
-  };
-}
-
 // Payload format matches openclaw gateway's buildDeviceAuthPayloadV3:
 // "v3|{deviceId}|{clientId}|{clientMode}|{role}|{scopes}|{signedAtMs}|{token}|{nonce}|{platform}|{deviceFamily}"
 function buildDevicePayloadV3(
@@ -105,7 +77,8 @@ function buildDevicePayloadV3(
 
 function signDevicePayload(privateKeyPem: string, payload: string): string {
   const key = createPrivateKey(privateKeyPem);
-  return toBase64Url(cryptoSign(null, Buffer.from(payload, "utf8"), key));
+  const sig = cryptoSign(null, Buffer.from(payload, "utf8"), key);
+  return sig.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 let webSocketFactory: WebSocketFactory = (url) => new WebSocket(url, { maxPayload: 25 * 1024 * 1024 });
@@ -164,6 +137,11 @@ function isAuthErrorText(text: string): boolean {
   );
 }
 
+function isPairingErrorText(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return normalized.includes("not_paired") || normalized.includes("pairing required");
+}
+
 function toGatewayRpcError(frame: RpcResponseFrame, context: string): GatewayRpcError {
   const message = extractErrorMessage(frame) || `${context} failed`;
   if (isCapabilityErrorText(message)) {
@@ -172,14 +150,80 @@ function toGatewayRpcError(frame: RpcResponseFrame, context: string): GatewayRpc
   if (isAuthErrorText(message)) {
     return new GatewayRpcError("auth", message);
   }
+  if (isPairingErrorText(message)) {
+    return new GatewayRpcError("pairing", message);
+  }
   return new GatewayRpcError("protocol", message);
 }
 
-export async function callGatewayRpc(
+/**
+ * Register this device with the Gateway via HTTP so subsequent WebSocket
+ * connect frames pass the Gateway's pairing check.
+ *
+ * The Gateway requires that any non-loopback operator client first pairs its
+ * device identity (public key + device-id) against a valid operator token.
+ * Without prior pairing the Gateway rejects WS connect frames from bridge
+ * network addresses with NOT_PAIRED.
+ *
+ * Calling this on startup (and retrying per-call on NOT_PAIRED responses)
+ * satisfies the pairing requirement without any network topology tricks.
+ */
+export async function pairWithGateway(
+  gatewayConfig: GatewayConfig,
+  deviceIdentity: DeviceIdentity,
+  timeoutMs: number
+): Promise<void> {
+  const url = new URL("/api/v1/pair", gatewayConfig.baseUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${gatewayConfig.token}`
+      },
+      body: JSON.stringify({
+        deviceId: deviceIdentity.deviceId,
+        publicKey: deviceIdentity.publicKeyRaw,
+        clientId: "gateway-client",
+        platform: process.platform,
+        mode: "backend"
+      }),
+      signal: controller.signal
+    });
+
+    // 200/201 = newly paired; 409 = already paired (both are success).
+    if (!response.ok && response.status !== 409) {
+      const body = await response.text().catch(() => "");
+      throw new GatewayRpcError(
+        "pairing",
+        `Gateway pair failed (${response.status} ${response.statusText})${body ? `: ${body.slice(0, 200)}` : ""}`
+      );
+    }
+  } catch (error: unknown) {
+    if (error instanceof GatewayRpcError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new GatewayRpcError("pairing", `Gateway pair request timed out after ${timeoutMs}ms`);
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new GatewayRpcError("pairing", `Gateway pair request failed: ${msg}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Single WS RPC attempt.  Throws GatewayRpcError("pairing", …) when the
+ * Gateway responds NOT_PAIRED so the caller can pair and retry exactly once.
+ */
+async function callGatewayRpcOnce(
   gatewayConfig: GatewayConfig,
   method: string,
   params: Record<string, unknown>,
-  timeoutMs: number
+  timeoutMs: number,
+  deviceIdentity?: DeviceIdentity
 ): Promise<unknown> {
   return await new Promise<unknown>((resolve, reject) => {
     const wsUrl = normalizeRpcUrl(gatewayConfig.baseUrl);
@@ -189,7 +233,9 @@ export async function callGatewayRpc(
     let settled = false;
     let connected = false;
     let connectSent = false;
-    const deviceIdentity = generateDeviceIdentity();
+    // Use the supplied stable identity when available; fall back to an ephemeral
+    // one only for callers that have not yet been wired to the startup identity.
+    const identity = deviceIdentity ?? generateDeviceIdentity();
 
     const stop = (error?: Error, result?: unknown): void => {
       if (settled) {
@@ -232,7 +278,7 @@ export async function callGatewayRpc(
       if (nonce) {
         const signedAtMs = Date.now();
         const payload = buildDevicePayloadV3(
-          deviceIdentity.deviceId,
+          identity.deviceId,
           scopes,
           signedAtMs,
           gatewayConfig.token,
@@ -240,9 +286,9 @@ export async function callGatewayRpc(
           process.platform
         );
         device = {
-          id: deviceIdentity.deviceId,
-          publicKey: deviceIdentity.publicKeyRaw,
-          signature: signDevicePayload(deviceIdentity.privateKeyPem, payload),
+          id: identity.deviceId,
+          publicKey: identity.publicKeyRaw,
+          signature: signDevicePayload(identity.privateKeyPem, payload),
           signedAt: signedAtMs,
           nonce
         };
@@ -364,6 +410,34 @@ export async function callGatewayRpc(
       stop(new GatewayRpcError("protocol", `Gateway connection closed (${code}): ${reasonText || "no close reason"}`));
     });
   });
+}
+
+/**
+ * Call a Gateway WebSocket RPC method, pairing the device automatically on
+ * first use (or after a Gateway restart clears its paired-device state).
+ *
+ * If the single WS attempt fails with NOT_PAIRED and a `deviceIdentity` is
+ * provided, this function calls `pairWithGateway` and retries exactly once.
+ * This satisfies the Gateway's pairing requirement for non-loopback clients
+ * without relying on any network topology shortcuts.
+ */
+export async function callGatewayRpc(
+  gatewayConfig: GatewayConfig,
+  method: string,
+  params: Record<string, unknown>,
+  timeoutMs: number,
+  deviceIdentity?: DeviceIdentity
+): Promise<unknown> {
+  try {
+    return await callGatewayRpcOnce(gatewayConfig, method, params, timeoutMs, deviceIdentity);
+  } catch (error: unknown) {
+    // On NOT_PAIRED: pair this device then retry the full WS call once.
+    if (error instanceof GatewayRpcError && error.kind === "pairing" && deviceIdentity) {
+      await pairWithGateway(gatewayConfig, deviceIdentity, timeoutMs);
+      return callGatewayRpcOnce(gatewayConfig, method, params, timeoutMs, deviceIdentity);
+    }
+    throw error;
+  }
 }
 
 export const __testing = {

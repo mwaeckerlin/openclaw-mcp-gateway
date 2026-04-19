@@ -16,7 +16,8 @@ import {
   loadGatewayConfig
 } from "./commands.js";
 import { CRON_RPC_OPERATIONS, isCronToolName, validateCronToolArguments } from "./cron.js";
-import { callGatewayRpc, GatewayRpcError } from "./gateway-rpc.js";
+import { callGatewayRpc, GatewayRpcError, pairWithGateway } from "./gateway-rpc.js";
+import { DeviceIdentity, loadOrCreateDeviceIdentity } from "./device-identity.js";
 import { getToolDefinitions } from "./tools.js";
 import {
   buildSkillsRpcParams,
@@ -94,15 +95,16 @@ function isGatewayCapabilityError(status: number, details: string): boolean {
   return messageSuggestsNotSupported(details);
 }
 
-export async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): Promise<string> {
-  return runAllowedToolWithArguments(toolName, {}, gatewayConfig, new Set());
+export async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig, deviceIdentity?: DeviceIdentity): Promise<string> {
+  return runAllowedToolWithArguments(toolName, {}, gatewayConfig, new Set(), deviceIdentity);
 }
 
 export async function runAllowedToolWithArguments(
   toolName: string,
   toolArguments: unknown,
   gatewayConfig: GatewayConfig,
-  disabledTools: ReadonlySet<string> = new Set()
+  disabledTools: ReadonlySet<string> = new Set(),
+  deviceIdentity?: DeviceIdentity
 ): Promise<string> {
   if (isToolDisabled(toolName, disabledTools)) {
     throw new McpError(ErrorCode.InvalidParams, `Tool disabled by DISABLE_TOOLS: ${toolName}`);
@@ -123,7 +125,7 @@ export async function runAllowedToolWithArguments(
     }
 
     try {
-      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs);
+      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs, deviceIdentity);
       return normalizeUnknownResponseBody(payload);
     } catch (error: unknown) {
       if (error instanceof GatewayRpcError) {
@@ -138,6 +140,9 @@ export async function runAllowedToolWithArguments(
         }
         if (error.kind === "timeout") {
           throw new McpError(ErrorCode.InternalError, `Gateway transport timeout: ${error.message}`);
+        }
+        if (error.kind === "pairing") {
+          throw new McpError(ErrorCode.InternalError, `Gateway pairing required: ${error.message}`);
         }
         if (error.kind === "protocol") {
           throw new McpError(ErrorCode.InternalError, `Gateway protocol failure: ${error.message}`);
@@ -162,7 +167,7 @@ export async function runAllowedToolWithArguments(
     }
 
     try {
-      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs);
+      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs, deviceIdentity);
       return shapeSkillsToolResponse(toolName, payload, validatedArguments);
     } catch (error: unknown) {
       if (error instanceof GatewayRpcError) {
@@ -177,6 +182,9 @@ export async function runAllowedToolWithArguments(
         }
         if (error.kind === "timeout") {
           throw new McpError(ErrorCode.InternalError, `Gateway transport timeout: ${error.message}`);
+        }
+        if (error.kind === "pairing") {
+          throw new McpError(ErrorCode.InternalError, `Gateway pairing required: ${error.message}`);
         }
         if (error.kind === "protocol") {
           throw new McpError(ErrorCode.InternalError, `Gateway protocol failure: ${error.message}`);
@@ -265,7 +273,7 @@ export async function runAllowedToolWithArguments(
   }
 }
 
-function createMcpServer(gatewayConfig: GatewayConfig, disabledTools: ReadonlySet<string>): Server {
+function createMcpServer(gatewayConfig: GatewayConfig, disabledTools: ReadonlySet<string>, deviceIdentity: DeviceIdentity): Server {
   const server = new Server(
     {
       name: "openclaw-mcp-gateway",
@@ -298,7 +306,8 @@ function createMcpServer(gatewayConfig: GatewayConfig, disabledTools: ReadonlySe
         toolName,
         request.params.arguments,
         gatewayConfig,
-        disabledTools
+        disabledTools,
+        deviceIdentity
       );
       return {
         content: [
@@ -365,7 +374,8 @@ async function handleMcpHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
   gatewayConfig: GatewayConfig,
-  disabledTools: ReadonlySet<string>
+  disabledTools: ReadonlySet<string>,
+  deviceIdentity: DeviceIdentity
 ): Promise<void> {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
@@ -382,7 +392,7 @@ async function handleMcpHttpRequest(
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined
   });
-  const server = createMcpServer(gatewayConfig, disabledTools);
+  const server = createMcpServer(gatewayConfig, disabledTools, deviceIdentity);
 
   try {
     await server.connect(transport);
@@ -399,8 +409,28 @@ export async function main(): Promise<void> {
   const port = getMcpListenPort();
   const host = getMcpListenHost();
 
+  // Load or create a stable device identity.  A stable identity is required so
+  // the Gateway can pair this device; ephemeral identities (new key per call)
+  // always appear as unknown devices and are rejected by the Gateway's pairing
+  // check when the connection originates from a non-loopback address.
+  const deviceFilePath = process.env.OPENCLAW_DEVICE_FILE?.trim() || "/run/openclaw/device.json";
+  const deviceIdentity = loadOrCreateDeviceIdentity(deviceFilePath);
+  console.error(`OpenClaw MCP Gateway: device id ${deviceIdentity.deviceId.slice(0, 16)}…`);
+
+  // Proactively pair the device with the Gateway on startup.  This ensures
+  // that subsequent WebSocket RPC calls succeed immediately without an extra
+  // round-trip.  The per-call retry in callGatewayRpc handles the case where
+  // the Gateway is restarted and its paired-device state is cleared.
+  try {
+    await pairWithGateway(gatewayConfig, deviceIdentity, 15_000);
+    console.error("OpenClaw MCP Gateway: device paired with Gateway");
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`OpenClaw MCP Gateway: startup pairing skipped — ${msg} (will retry per-call)`);
+  }
+
   const httpServer = createServer((req, res) => {
-    void handleMcpHttpRequest(req, res, gatewayConfig, disabledTools).catch((error: unknown) => {
+    void handleMcpHttpRequest(req, res, gatewayConfig, disabledTools, deviceIdentity).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`HTTP request handling failed: ${message}`);
 

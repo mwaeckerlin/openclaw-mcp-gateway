@@ -17,9 +17,11 @@ Use this skill to operate the `openclaw-mcp-gateway` service safely and effectiv
 
 1. Set `OPENCLAW_GATEWAY_URL`.
 2. Set `OPENCLAW_GATEWAY_TOKEN` (or legacy `OPENCLAW_GATEWAY_KEY`) or mount `/run/secret/openclaw_gateway_token`.
-3. Start service (`npm start` or compose).
-4. Verify `GET /healthz` returns `{ "ok": true, "status": "ready" }`.
-5. Verify MCP `tools/list` contains:
+3. Mount a persistent volume at the directory containing `OPENCLAW_DEVICE_FILE` (default `/run/openclaw/device.json`) so the device identity survives container restarts.
+4. Start service (`npm start` or compose).
+5. Confirm startup log shows `device paired with Gateway` (or `startup pairing skipped — will retry per-call`).
+6. Verify `GET /healthz` returns `{ "ok": true, "status": "ready" }`.
+7. Verify MCP `tools/list` contains:
    - `openclaw_status`
    - `openclaw_gateway_status`
    - `openclaw_sessions_list`
@@ -292,6 +294,17 @@ Available only in `openclaw_cron_update.patch.state`. Used to manually correct j
 | `Gateway transport timeout` | Gateway unreachable or stalled | Check `OPENCLAW_GATEWAY_URL` connectivity |
 | `Gateway protocol failure` | Malformed or non-ok RPC frame | Check Gateway version compatibility |
 | `not supported by the current Gateway` | Gateway lacks required cron method | Upgrade Gateway |
+| `Gateway pairing required` | Device not paired after retry | Ensure `POST /api/v1/pair` reaches the Gateway; check token; verify `OPENCLAW_DEVICE_FILE` volume is writable |
+
+## Network Segregation (Security)
+
+Use **two separate bridge networks** — never a single shared network and never `network_mode: service:…`:
+
+```
+[openclaw] ←—openclaw-mcp-gateway—→ [mcp-gateway] ←—client-network—→ [AI agent / client]
+```
+
+The client must **not** share a network segment with the openclaw container.  If it does, the client can sniff the `Authorization: Bearer …` header on the token-carrying network segment and obtain the operator token directly.
 
 ## Safe Operating Rules
 
