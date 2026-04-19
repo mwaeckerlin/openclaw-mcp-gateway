@@ -357,3 +357,17 @@ npm run build         # compiles TypeScript to dist/
 npm run build:docker  # builds the Docker image
 npm test              # runs unit tests, then E2E tests inside Docker Compose
 ```
+
+## Running
+
+**In foreground (see logs in real-time):**
+```bash
+npm start
+```
+
+**In background (daemon mode):**
+```bash
+npm run start:daemon
+```
+
+Runs `docker compose up --build --force-recreate --remove-orphans` and starts the full stack.
