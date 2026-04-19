@@ -11,7 +11,7 @@ Use this skill to operate the `openclaw-mcp-gateway` service safely and effectiv
 
 - Exposes a strict MCP allowlist for OpenClaw Gateway operations.
 - Keeps gateway credentials outside SSH sandbox agents.
-- Supports fixed HTTP tools and allowlisted Gateway WebSocket RPC cron tools.
+- Supports safe read-only status/session/skill visibility plus allowlisted Gateway WebSocket RPC cron tools.
 
 ## Setup Checklist
 
@@ -22,6 +22,10 @@ Use this skill to operate the `openclaw-mcp-gateway` service safely and effectiv
 5. Verify MCP `tools/list` contains:
    - `openclaw_status`
    - `openclaw_gateway_status`
+   - `openclaw_sessions_list`
+   - `openclaw_session_status`
+   - `openclaw_skills_list`
+   - `openclaw_skills_detail`
    - `openclaw_cron_status`
    - `openclaw_cron_list`
    - `openclaw_cron_add`
@@ -34,11 +38,42 @@ Use this skill to operate the `openclaw-mcp-gateway` service safely and effectiv
 
 ### `openclaw_status`
 
-No parameters. Lists active OpenClaw sessions (calls `POST /tools/invoke` with `sessions_list`).
+No parameters. Returns a safe bounded session summary (legacy alias of `openclaw_sessions_list`).
 
 ### `openclaw_gateway_status`
 
-No parameters. Checks gateway health (calls `GET /healthz`).
+No parameters. Checks gateway health (calls `GET /healthz`) and returns only curated safe fields.
+
+### `openclaw_sessions_list`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `kind` | `"main"` \| `"group"` \| `"cron"` \| `"hook"` \| `"node"` | Filter by session kind |
+| `activeMinutes` | integer 1–10080 | Filter to recently active sessions |
+| `limit` | integer 1–100 | Max sessions to return |
+| `offset` | integer 0–1000 | Pagination offset |
+
+### `openclaw_session_status`
+
+Exactly one of `sessionKey` or `sessionId` is required.
+
+### `openclaw_skills_list`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `agentId` | string | Optional agent workspace selector |
+| `limit` | integer 1–100 | Max skills to return |
+| `offset` | integer 0–1000 | Pagination offset |
+| `eligible` | boolean | Restrict to currently eligible skills |
+| `query` | string | Filter by skill name/key/description |
+
+### `openclaw_skills_detail`
+
+Exactly one of `skillKey` or `name` is required (optional `agentId` supported).
 
 ### `openclaw_cron_status`
 
@@ -262,5 +297,7 @@ Available only in `openclaw_cron_update.patch.state`. Used to manually correct j
 
 - Never expose Gateway token to sandboxed agents.
 - Use only allowlisted MCP tools; do not bypass with raw Gateway RPC.
+- Session/skill/status tools are read-only with strict local argument validation and curated response shaping.
+- `DISABLE_TOOLS` can hide and hard-disable any listed MCP tool name (comma/whitespace separated, exact match).
 - Keep per-tool usage scoped to required operation only.
 - Cron tools connect to Gateway via WebSocket on the same base URL (`http` → `ws`, `https` → `wss`).

@@ -94,6 +94,10 @@ async function main() {
     const requiredTools = [
       "openclaw_status",
       "openclaw_gateway_status",
+      "openclaw_sessions_list",
+      "openclaw_session_status",
+      "openclaw_skills_list",
+      "openclaw_skills_detail",
       "openclaw_cron_status",
       "openclaw_cron_list",
       "openclaw_cron_add",
@@ -138,7 +142,7 @@ async function main() {
     }
 
     // ------------------------------------------------------- openclaw_status
-    // POSITIVE: Tool must return the active session list from the upstream gateway.
+    // POSITIVE: Tool must return the safe session summary.
     try {
       const r = await client.callTool({ name: "openclaw_status" });
       if (!r.isError) {
@@ -148,16 +152,14 @@ async function main() {
         } else {
           try {
             const parsed = JSON.parse(text.text);
-            const details = parsed?.result?.details;
             if (
-              parsed.ok === true &&
-              details &&
-              Array.isArray(details.sessions) &&
-              typeof details.count === "number"
+              typeof parsed.total === "number" &&
+              typeof parsed.limit === "number" &&
+              Array.isArray(parsed.sessions)
             ) {
-              pass(`openclaw_status → count=${details.count} sessions=${JSON.stringify(details.sessions)}`);
+              pass(`openclaw_status → total=${parsed.total} returned=${parsed.returned}`);
             } else {
-              fail("openclaw_status → missing expected fields ok/result.details.count/result.details.sessions", text.text.slice(0, 200));
+              fail("openclaw_status → missing expected fields total/limit/sessions", text.text.slice(0, 200));
             }
           } catch {
             fail("openclaw_status → response is not valid JSON", text.text.slice(0, 200));
@@ -168,6 +170,96 @@ async function main() {
       }
     } catch (e) {
       fail("openclaw_status → unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------ openclaw_sessions_list
+    try {
+      const r = await client.callTool({ name: "openclaw_sessions_list", arguments: { limit: 5, offset: 0 } });
+      if (!r.isError) {
+        const text = firstTextContent(r.content);
+        if (!text) {
+          fail("openclaw_sessions_list → no text content", JSON.stringify(r));
+        } else {
+          try {
+            const parsed = JSON.parse(text.text);
+            if (typeof parsed.total === "number" && parsed.limit === 5 && Array.isArray(parsed.sessions)) {
+              pass(`openclaw_sessions_list → total=${parsed.total} returned=${parsed.returned}`);
+            } else {
+              fail("openclaw_sessions_list → missing expected fields total/limit/sessions", text.text.slice(0, 200));
+            }
+          } catch {
+            fail("openclaw_sessions_list → response is not valid JSON", text.text.slice(0, 200));
+          }
+        }
+      } else {
+        fail("openclaw_sessions_list → expected success, got error", JSON.stringify(r.content));
+      }
+    } catch (e) {
+      fail("openclaw_sessions_list → unexpected exception", e.message);
+    }
+
+    // --------------------------------------------------- openclaw_skills_list
+    let firstSkillKey = null;
+    try {
+      const r = await client.callTool({ name: "openclaw_skills_list", arguments: { limit: 5, offset: 0 } });
+      if (!r.isError) {
+        const text = firstTextContent(r.content);
+        if (!text) {
+          fail("openclaw_skills_list → no text content", JSON.stringify(r));
+        } else {
+          try {
+            const parsed = JSON.parse(text.text);
+            if (typeof parsed.total === "number" && parsed.limit === 5 && Array.isArray(parsed.skills)) {
+              firstSkillKey =
+                parsed.skills.length > 0 && typeof parsed.skills[0]?.skillKey === "string"
+                  ? parsed.skills[0].skillKey
+                  : null;
+              pass(`openclaw_skills_list → total=${parsed.total} returned=${parsed.returned}`);
+            } else {
+              fail("openclaw_skills_list → missing expected fields total/limit/skills", text.text.slice(0, 200));
+            }
+          } catch {
+            fail("openclaw_skills_list → response is not valid JSON", text.text.slice(0, 200));
+          }
+        }
+      } else {
+        fail("openclaw_skills_list → expected success, got error", JSON.stringify(r.content));
+      }
+    } catch (e) {
+      fail("openclaw_skills_list → unexpected exception", e.message);
+    }
+
+    // -------------------------------------------------- openclaw_skills_detail
+    if (firstSkillKey) {
+      try {
+        const r = await client.callTool({
+          name: "openclaw_skills_detail",
+          arguments: { skillKey: firstSkillKey },
+        });
+        if (!r.isError) {
+          const text = firstTextContent(r.content);
+          if (!text) {
+            fail("openclaw_skills_detail → no text content", JSON.stringify(r));
+          } else {
+            try {
+              const parsed = JSON.parse(text.text);
+              if (parsed.skillKey === firstSkillKey && typeof parsed.name === "string") {
+                pass(`openclaw_skills_detail → skillKey=${parsed.skillKey}`);
+              } else {
+                fail("openclaw_skills_detail → missing expected fields skillKey/name", text.text.slice(0, 200));
+              }
+            } catch {
+              fail("openclaw_skills_detail → response is not valid JSON", text.text.slice(0, 200));
+            }
+          }
+        } else {
+          fail("openclaw_skills_detail → expected success, got error", JSON.stringify(r.content));
+        }
+      } catch (e) {
+        fail("openclaw_skills_detail → unexpected exception", e.message);
+      }
+    } else {
+      pass("openclaw_skills_detail → skipped because skills_list returned no visible skills");
     }
 
     // ----------------------------------------------- openclaw_cron_status

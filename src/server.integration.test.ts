@@ -74,6 +74,17 @@ function hasIsErrorTrue(value: unknown): boolean {
   return value.isError === true;
 }
 
+function parseJsonTextOutput(content: unknown): Record<string, unknown> {
+  if (!Array.isArray(content)) {
+    throw new Error("Tool response content is not an array");
+  }
+  const textOutput = content.find(isTextContent);
+  if (!textOutput) {
+    throw new Error("Tool response did not include text content");
+  }
+  return JSON.parse(textOutput.text) as Record<string, unknown>;
+}
+
 test(
   "MCP HTTP gateway calls live OpenClaw Gateway for all tools and handles negative cases",
   {
@@ -106,6 +117,10 @@ test(
       const toolNames = new Set(tools.tools.map((tool) => tool.name));
       assert.ok(toolNames.has("openclaw_status"));
       assert.ok(toolNames.has("openclaw_gateway_status"));
+      assert.ok(toolNames.has("openclaw_sessions_list"));
+      assert.ok(toolNames.has("openclaw_session_status"));
+      assert.ok(toolNames.has("openclaw_skills_list"));
+      assert.ok(toolNames.has("openclaw_skills_detail"));
       assert.ok(toolNames.has("openclaw_cron_status"));
       assert.ok(toolNames.has("openclaw_cron_list"));
       assert.ok(toolNames.has("openclaw_cron_add"));
@@ -117,18 +132,45 @@ test(
       const statusResult = await client.callTool({
         name: "openclaw_status"
       });
-      assert.ok(Array.isArray(statusResult.content));
-      const statusTextOutput = statusResult.content.find(isTextContent);
-      assert.ok(statusTextOutput);
-      assert.ok(statusTextOutput.text.trim().length > 0);
+      const statusPayload = parseJsonTextOutput(statusResult.content);
+      assert.equal(typeof statusPayload.total, "number");
+      assert.ok(Array.isArray(statusPayload.sessions));
 
       const gatewayStatusResult = await client.callTool({
         name: "openclaw_gateway_status"
       });
-      assert.ok(Array.isArray(gatewayStatusResult.content));
-      const gatewayStatusTextOutput = gatewayStatusResult.content.find(isTextContent);
-      assert.ok(gatewayStatusTextOutput);
-      assert.ok(gatewayStatusTextOutput.text.trim().length > 0);
+      const gatewayPayload = parseJsonTextOutput(gatewayStatusResult.content);
+      assert.equal(gatewayPayload.ok, true);
+      assert.equal(typeof gatewayPayload.status, "string");
+
+      const sessionsListResult = await client.callTool({
+        name: "openclaw_sessions_list",
+        arguments: { limit: 5, offset: 0 }
+      });
+      const sessionsListPayload = parseJsonTextOutput(sessionsListResult.content);
+      assert.equal(typeof sessionsListPayload.total, "number");
+      assert.equal(sessionsListPayload.limit, 5);
+      assert.ok(Array.isArray(sessionsListPayload.sessions));
+
+      const skillsListResult = await client.callTool({
+        name: "openclaw_skills_list",
+        arguments: { limit: 3, offset: 0 }
+      });
+      const skillsListPayload = parseJsonTextOutput(skillsListResult.content);
+      assert.equal(typeof skillsListPayload.total, "number");
+      assert.ok(Array.isArray(skillsListPayload.skills));
+      if (skillsListPayload.skills.length > 0) {
+        const firstSkill = skillsListPayload.skills[0] as Record<string, unknown>;
+        assert.equal(typeof firstSkill.name, "string");
+        assert.equal(typeof firstSkill.skillKey, "string");
+
+        const skillsDetailResult = await client.callTool({
+          name: "openclaw_skills_detail",
+          arguments: { skillKey: firstSkill.skillKey as string }
+        });
+        const skillDetailPayload = parseJsonTextOutput(skillsDetailResult.content);
+        assert.equal(skillDetailPayload.skillKey, firstSkill.skillKey);
+      }
 
       try {
         const unknownToolResult = await client.callTool({
