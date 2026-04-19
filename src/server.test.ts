@@ -93,7 +93,7 @@ test("runAllowedToolWithArguments returns (no output) for empty 200 body", async
   });
 });
 
-test("runAllowedToolWithArguments returns formatted JSON for openclaw_status on 200", async () => {
+test("runAllowedToolWithArguments returns formatted JSON for openclaw_sessions_list on 200", async () => {
   const body = {
     ok: true,
     result: {
@@ -107,7 +107,7 @@ test("runAllowedToolWithArguments returns formatted JSON for openclaw_status on 
     }
   };
   await withFetch(async () => makeJsonResponse(200, body), async () => {
-    const result = await runAllowedToolWithArguments("openclaw_status", {}, TEST_CONFIG);
+    const result = await runAllowedToolWithArguments("openclaw_sessions_list", {}, TEST_CONFIG);
     const parsed = JSON.parse(result);
     assert.equal(parsed.total, 2);
     assert.equal(parsed.returned, 2);

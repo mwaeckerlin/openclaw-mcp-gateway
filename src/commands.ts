@@ -5,7 +5,6 @@ import { CronToolName, isCronToolName } from "./cron.js";
 type JsonObject = Record<string, unknown>;
 
 export type HttpToolName =
-  | "openclaw_status"
   | "openclaw_gateway_status"
   | "openclaw_sessions_list"
   | "openclaw_session_status";
@@ -101,13 +100,6 @@ const SESSION_STATUS_USAGE_SAFE_FIELDS = [
 const SESSION_STATUS_TASK_SAFE_FIELDS = ["runId", "runtime", "status", "startedAtMs", "updatedAtMs"] as const;
 
 export const ALLOWED_HTTP_GATEWAY_OPERATIONS: Record<HttpToolName, AllowedGatewayOperation> = {
-  openclaw_status: {
-    requestKind: "invoke",
-    timeoutMs: 12_000,
-    description: "Return a safe, bounded summary of OpenClaw sessions (legacy alias of openclaw_sessions_list).",
-    tool: "sessions_list",
-    action: "json"
-  },
   openclaw_gateway_status: {
     requestKind: "check",
     timeoutMs: 12_000,
@@ -354,7 +346,6 @@ function validateNoArguments(rawArguments: unknown): JsonObject {
 export function validateHttpToolArguments(toolName: HttpToolName, rawArguments: unknown): JsonObject {
   switch (toolName) {
     case "openclaw_gateway_status":
-    case "openclaw_status":
       return validateNoArguments(rawArguments);
     case "openclaw_sessions_list":
       return validateOpenclawSessionsListArgs(rawArguments);
@@ -400,7 +391,6 @@ export function shapeHttpToolResponse(
 
     const details = readInvokeDetails(trimmed);
     switch (toolName) {
-      case "openclaw_status":
       case "openclaw_sessions_list":
         return shapeSessionsList(details, validatedArguments);
       case "openclaw_session_status":

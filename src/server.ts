@@ -26,6 +26,11 @@ import {
   shapeSkillsToolResponse,
   validateSkillsToolArguments
 } from "./skills.js";
+import {
+  isReadonlyRpcToolName,
+  runReadonlyRpcToolWithArguments,
+  validateReadonlyRpcToolArguments
+} from "./readonly-rpc-tools.js";
 import { isToolDisabled, loadDisabledToolsFromEnv } from "./disabled-tools.js";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
@@ -110,8 +115,19 @@ export async function runAllowedToolWithArguments(
     throw new McpError(ErrorCode.InvalidParams, `Tool disabled by DISABLE_TOOLS: ${toolName}`);
   }
 
-  if (!isHttpToolName(toolName) && !isCronToolName(toolName) && !isSkillsToolName(toolName)) {
+  if (!isHttpToolName(toolName) && !isCronToolName(toolName) && !isSkillsToolName(toolName) && !isReadonlyRpcToolName(toolName)) {
     throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
+  }
+
+  if (isReadonlyRpcToolName(toolName)) {
+    let validatedArguments: Record<string, unknown>;
+    try {
+      validatedArguments = validateReadonlyRpcToolArguments(toolName, toolArguments);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new McpError(ErrorCode.InvalidParams, `${toolName} validation failed: ${message}`);
+    }
+    return await runReadonlyRpcToolWithArguments(toolName, validatedArguments, gatewayConfig, deviceIdentity);
   }
 
   if (isCronToolName(toolName)) {
@@ -291,7 +307,7 @@ function createMcpServer(gatewayConfig: GatewayConfig, disabledTools: ReadonlySe
       throw new McpError(ErrorCode.InvalidParams, `Tool disabled by DISABLE_TOOLS: ${toolName}`);
     }
 
-    if (!isHttpToolName(toolName) && !isCronToolName(toolName) && !isSkillsToolName(toolName)) {
+    if (!isHttpToolName(toolName) && !isCronToolName(toolName) && !isSkillsToolName(toolName) && !isReadonlyRpcToolName(toolName)) {
       throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
     }
 

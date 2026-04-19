@@ -118,7 +118,40 @@ async function main() {
     const toolNames = tools.map((t) => t.name);
 
     const requiredTools = [
+      "openclaw_health",
       "openclaw_status",
+      "openclaw_logs",
+      "openclaw_gateway_probe",
+      "openclaw_gateway_usage_cost",
+      "openclaw_doctor",
+      "openclaw_channels_list",
+      "openclaw_channels_status",
+      "openclaw_channels_capabilities",
+      "openclaw_channels_resolve",
+      "openclaw_channels_logs",
+      "openclaw_plugins_list",
+      "openclaw_plugins_inspect",
+      "openclaw_plugins_doctor",
+      "openclaw_models_status",
+      "openclaw_models_list",
+      "openclaw_models_aliases_list",
+      "openclaw_models_fallbacks_list",
+      "openclaw_config_get",
+      "openclaw_config_file",
+      "openclaw_config_validate",
+      "openclaw_config_schema",
+      "openclaw_config_schema_lookup",
+      "openclaw_security_audit",
+      "openclaw_secrets_audit",
+      "openclaw_approvals_get",
+      "openclaw_devices_list",
+      "openclaw_nodes_list",
+      "openclaw_nodes_pending",
+      "openclaw_nodes_status",
+      "openclaw_skills_check",
+      "openclaw_sandbox_explain",
+      "openclaw_sandbox_list",
+      "openclaw_system_presence",
       "openclaw_gateway_status",
       "openclaw_sessions_list",
       "openclaw_session_status",
@@ -168,7 +201,7 @@ async function main() {
     }
 
     // ------------------------------------------------------- openclaw_status
-    // POSITIVE: Tool must return the safe session summary.
+    // POSITIVE: Tool must return status family output.
     try {
       const r = await client.callTool({ name: "openclaw_status" });
       if (!r.isError) {
@@ -178,14 +211,10 @@ async function main() {
         } else {
           try {
             const parsed = JSON.parse(text.text);
-            if (
-              typeof parsed.total === "number" &&
-              typeof parsed.limit === "number" &&
-              Array.isArray(parsed.sessions)
-            ) {
-              pass(`openclaw_status → total=${parsed.total} returned=${parsed.returned}`);
+            if (parsed && typeof parsed.status === "object" && parsed.status !== null) {
+              pass("openclaw_status → returned status object");
             } else {
-              fail("openclaw_status → missing expected fields total/limit/sessions", text.text.slice(0, 200));
+              fail("openclaw_status → missing expected status object", text.text.slice(0, 200));
             }
           } catch {
             fail("openclaw_status → response is not valid JSON", text.text.slice(0, 200));
@@ -196,6 +225,57 @@ async function main() {
       }
     } catch (e) {
       fail("openclaw_status → unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------------- openclaw_health
+    try {
+      const r = await client.callTool({ name: "openclaw_health" });
+      if (!r.isError) {
+        const text = firstTextContent(r.content);
+        if (text) {
+          const parsed = JSON.parse(text.text);
+          if (typeof parsed.ok === "boolean" || typeof parsed.durationMs === "number") pass("openclaw_health → returned health payload");
+          else fail("openclaw_health → unexpected payload", text.text.slice(0, 200));
+        } else fail("openclaw_health → no text content", JSON.stringify(r));
+      } else {
+        fail("openclaw_health → expected success, got error", JSON.stringify(r.content));
+      }
+    } catch (e) {
+      fail("openclaw_health → unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------------- openclaw_config_validate
+    try {
+      const r = await client.callTool({ name: "openclaw_config_validate" });
+      if (!r.isError) {
+        const text = firstTextContent(r.content);
+        if (text) {
+          const parsed = JSON.parse(text.text);
+          if (typeof parsed.valid === "boolean") pass(`openclaw_config_validate → valid=${parsed.valid}`);
+          else fail("openclaw_config_validate → missing valid field", text.text.slice(0, 200));
+        } else fail("openclaw_config_validate → no text content", JSON.stringify(r));
+      } else {
+        fail("openclaw_config_validate → expected success, got error", JSON.stringify(r.content));
+      }
+    } catch (e) {
+      fail("openclaw_config_validate → unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------------- openclaw_system_presence
+    try {
+      const r = await client.callTool({ name: "openclaw_system_presence" });
+      if (!r.isError) {
+        const text = firstTextContent(r.content);
+        if (text) {
+          const parsed = JSON.parse(text.text);
+          if (Array.isArray(parsed)) pass(`openclaw_system_presence → entries=${parsed.length}`);
+          else fail("openclaw_system_presence → expected array", text.text.slice(0, 200));
+        } else fail("openclaw_system_presence → no text content", JSON.stringify(r));
+      } else {
+        fail("openclaw_system_presence → expected success, got error", JSON.stringify(r.content));
+      }
+    } catch (e) {
+      fail("openclaw_system_presence → unexpected exception", e.message);
     }
 
     // ------------------------------------------------ openclaw_sessions_list

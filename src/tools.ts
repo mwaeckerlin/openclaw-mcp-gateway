@@ -1,8 +1,9 @@
 import { ALLOWED_HTTP_GATEWAY_OPERATIONS, HttpToolName } from "./commands.js";
 import { CRON_RPC_OPERATIONS, CRON_TOOL_INPUT_SCHEMAS, CronToolName } from "./cron.js";
+import { READONLY_RPC_TOOL_DEFINITIONS, ReadonlyRpcToolName } from "./readonly-rpc-tools.js";
 import { SKILLS_RPC_OPERATIONS, SKILLS_TOOL_INPUT_SCHEMAS, SkillsToolName } from "./skills.js";
 
-export type AllowedToolName = HttpToolName | CronToolName | SkillsToolName;
+export type AllowedToolName = HttpToolName | CronToolName | SkillsToolName | ReadonlyRpcToolName;
 
 export interface ToolDefinition {
   name: AllowedToolName;
@@ -17,15 +18,7 @@ export interface ToolDefinition {
 }
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
-  {
-    name: "openclaw_status",
-    description: ALLOWED_HTTP_GATEWAY_OPERATIONS.openclaw_status.description,
-    inputSchema: {
-      type: "object",
-      properties: {},
-      additionalProperties: false
-    }
-  },
+  ...READONLY_RPC_TOOL_DEFINITIONS,
   {
     name: "openclaw_gateway_status",
     description: ALLOWED_HTTP_GATEWAY_OPERATIONS.openclaw_gateway_status.description,
