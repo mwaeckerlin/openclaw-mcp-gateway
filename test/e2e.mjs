@@ -148,10 +148,16 @@ async function main() {
         } else {
           try {
             const parsed = JSON.parse(text.text);
-            if (Array.isArray(parsed.sessions) && typeof parsed.count === "number") {
-              pass(`openclaw_status → count=${parsed.count} sessions=${JSON.stringify(parsed.sessions)}`);
+            const details = parsed?.result?.details;
+            if (
+              parsed.ok === true &&
+              details &&
+              Array.isArray(details.sessions) &&
+              typeof details.count === "number"
+            ) {
+              pass(`openclaw_status → count=${details.count} sessions=${JSON.stringify(details.sessions)}`);
             } else {
-              fail("openclaw_status → missing expected fields sessions/count", text.text.slice(0, 200));
+              fail("openclaw_status → missing expected fields ok/result.details.count/result.details.sessions", text.text.slice(0, 200));
             }
           } catch {
             fail("openclaw_status → response is not valid JSON", text.text.slice(0, 200));
