@@ -62,6 +62,7 @@ mcp -up-> gateway    : forward verified calls
 | `OPENCLAW_GATEWAY_KEY` | no | Deprecated alias for `OPENCLAW_GATEWAY_TOKEN` |
 | `OPENCLAW_MCP_HOST` | no | Host to bind (default: `0.0.0.0`) |
 | `OPENCLAW_MCP_PORT` | no | Port to listen on (default: `4000`) |
+| `OPENCLAW_DEVICE_IDENTITY` | no | JSON-encoded `DeviceIdentity` object (overrides `OPENCLAW_DEVICE_FILE`) |
 | `OPENCLAW_DEVICE_FILE` | no | Path to the persistent device identity file (default: `/run/openclaw/device.json`) |
 | `DISABLE_TOOLS` | no | Disable specific MCP tools by exact name (comma and/or whitespace separated) |
 
@@ -71,17 +72,25 @@ Cron and Skills MCP tools use Gateway WebSocket RPC on the same Gateway base URL
 
 ### Gateway device pairing
 
-WebSocket RPC tools (`openclaw_cron_*`, `openclaw_skills_*`) require the MCP gateway to be **paired** with the OpenClaw Gateway before opening a WebSocket connection.  The pairing flow works as follows:
+WebSocket RPC tools (`openclaw_cron_*`, `openclaw_skills_*`) authenticate to the OpenClaw Gateway using an **Ed25519 device identity** during the `connect.challenge` handshake.  The flow is:
 
-1. **Startup**: the MCP gateway generates or loads a stable Ed25519 device key pair from `OPENCLAW_DEVICE_FILE` (default `/run/openclaw/device.json`).  A stable identity is required because the Gateway records the device's public key in its paired-device registry; an ephemeral key generated on every call would always be "unknown" and rejected.
-2. **Registration**: on startup the MCP gateway calls `POST /api/v1/pair` on the OpenClaw Gateway (using `OPENCLAW_GATEWAY_URL` and `OPENCLAW_GATEWAY_TOKEN`) to register the device public key.  A `200` or `409` (already paired) response both indicate success.
-3. **WS connect**: when a WebSocket RPC call is needed the MCP gateway opens a WS connection to the Gateway and presents the device identity (signed with the private key) in the connect frame.  The Gateway verifies the signature and checks that the device is paired.
-4. **Automatic retry**: if the Gateway responds `NOT_PAIRED` (e.g. after a Gateway restart cleared its state), the MCP gateway automatically calls `POST /api/v1/pair` again and retries the WS connect exactly once.
+1. **Device identity**: the MCP gateway holds a stable Ed25519 key pair.  At startup it reads it from:
+   - `OPENCLAW_DEVICE_IDENTITY` env var (JSON string `{"deviceId":"…","publicKeyRaw":"…","privateKeyPem":"…"}`), or
+   - the file at `OPENCLAW_DEVICE_FILE` (default `/run/openclaw/device.json`).  
+   If neither exists a new key pair is generated and written to the file path.
 
-In production, mount a named volume (or persistent host path) at the directory containing `OPENCLAW_DEVICE_FILE` so the device identity survives container restarts.  If no file exists, a new identity is generated and written automatically.
+2. **Pre-provisioned pairing**: before starting the MCP gateway, the same device public key must be registered in the OpenClaw Gateway via the `OPENCLAW_DEVICE_PAIRING` env var on the Gateway side:
+   ```json
+   {"deviceId":"…","publicKey":"…"}
+   ```
+   This tells the Gateway to trust connections that present a valid signature from the matching private key.
+
+3. **WS connect**: when a WebSocket RPC call is needed the MCP gateway opens a WS connection, receives a `connect.challenge` event from the Gateway, signs the challenge nonce with its private key, and includes the `device` field in the `connect` request frame.  The Gateway verifies the signature against the pre-registered public key and grants the connection.
+
+**No runtime HTTP pairing calls are made.** The first WS connect succeeds directly as long as the device public key was pre-registered.
 
 > ⚠️ **Pairing is incompatible with loopback shortcuts.**
-> Do not use `network_mode: service:openclaw` or point `OPENCLAW_GATEWAY_URL` at `127.0.0.1` / `localhost`.  Those tricks rely on `skipLocalBackendSelfPairing` inside the OpenClaw Gateway and bypass the pairing check entirely.  The proper flow — stable device identity + `POST /api/v1/pair` — works correctly over any bridge or overlay network and is required for all non-trivial deployments.
+> Do not use `network_mode: service:openclaw` or point `OPENCLAW_GATEWAY_URL` at `127.0.0.1` / `localhost`.  Those tricks rely on `skipLocalBackendSelfPairing` inside the OpenClaw Gateway and bypass the pairing check entirely.  The proper flow — stable device identity + `OPENCLAW_DEVICE_PAIRING` — works correctly over any bridge or overlay network and is required for all real deployments.
 
 ### Network segregation and token security
 

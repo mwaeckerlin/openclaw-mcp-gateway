@@ -16,8 +16,8 @@ import {
   loadGatewayConfig
 } from "./commands.js";
 import { CRON_RPC_OPERATIONS, isCronToolName, validateCronToolArguments } from "./cron.js";
-import { callGatewayRpc, GatewayRpcError, pairWithGateway } from "./gateway-rpc.js";
-import { DeviceIdentity, loadOrCreateDeviceIdentity } from "./device-identity.js";
+import { callGatewayRpc, GatewayRpcError } from "./gateway-rpc.js";
+import { DeviceIdentity, loadDeviceIdentityFromEnv, loadOrCreateDeviceIdentity } from "./device-identity.js";
 import { getToolDefinitions } from "./tools.js";
 import {
   buildSkillsRpcParams,
@@ -141,9 +141,6 @@ export async function runAllowedToolWithArguments(
         if (error.kind === "timeout") {
           throw new McpError(ErrorCode.InternalError, `Gateway transport timeout: ${error.message}`);
         }
-        if (error.kind === "pairing") {
-          throw new McpError(ErrorCode.InternalError, `Gateway pairing required: ${error.message}`);
-        }
         if (error.kind === "protocol") {
           throw new McpError(ErrorCode.InternalError, `Gateway protocol failure: ${error.message}`);
         }
@@ -182,9 +179,6 @@ export async function runAllowedToolWithArguments(
         }
         if (error.kind === "timeout") {
           throw new McpError(ErrorCode.InternalError, `Gateway transport timeout: ${error.message}`);
-        }
-        if (error.kind === "pairing") {
-          throw new McpError(ErrorCode.InternalError, `Gateway pairing required: ${error.message}`);
         }
         if (error.kind === "protocol") {
           throw new McpError(ErrorCode.InternalError, `Gateway protocol failure: ${error.message}`);
@@ -409,25 +403,14 @@ export async function main(): Promise<void> {
   const port = getMcpListenPort();
   const host = getMcpListenHost();
 
-  // Load or create a stable device identity.  A stable identity is required so
-  // the Gateway can pair this device; ephemeral identities (new key per call)
-  // always appear as unknown devices and are rejected by the Gateway's pairing
-  // check when the connection originates from a non-loopback address.
-  const deviceFilePath = process.env.OPENCLAW_DEVICE_FILE?.trim() || "/run/openclaw/device.json";
-  const deviceIdentity = loadOrCreateDeviceIdentity(deviceFilePath);
+  // Load the stable device identity.  Check the OPENCLAW_DEVICE_IDENTITY env
+  // var first (used in E2E tests where the identity is pre-generated and
+  // injected alongside the matching OPENCLAW_DEVICE_PAIRING on the Gateway).
+  // Fall back to the file-based identity for production deployments.
+  const deviceIdentity =
+    loadDeviceIdentityFromEnv() ??
+    loadOrCreateDeviceIdentity(process.env.OPENCLAW_DEVICE_FILE?.trim() || "/run/openclaw/device.json");
   console.error(`OpenClaw MCP Gateway: device id ${deviceIdentity.deviceId.slice(0, 16)}…`);
-
-  // Proactively pair the device with the Gateway on startup.  This ensures
-  // that subsequent WebSocket RPC calls succeed immediately without an extra
-  // round-trip.  The per-call retry in callGatewayRpc handles the case where
-  // the Gateway is restarted and its paired-device state is cleared.
-  try {
-    await pairWithGateway(gatewayConfig, deviceIdentity, 15_000);
-    console.error("OpenClaw MCP Gateway: device paired with Gateway");
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`OpenClaw MCP Gateway: startup pairing skipped — ${msg} (will retry per-call)`);
-  }
 
   const httpServer = createServer((req, res) => {
     void handleMcpHttpRequest(req, res, gatewayConfig, disabledTools, deviceIdentity).catch((error: unknown) => {

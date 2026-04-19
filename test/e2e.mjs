@@ -294,13 +294,13 @@ async function main() {
     // PAIRING PROOF: openclaw_cron_status uses a WebSocket RPC call.  The WS
     // connection originates from the mcp-gateway container, which is on the
     // openclaw-mcp-gateway bridge network and connects to openclaw:18789 by
-    // container DNS name — NOT via loopback.  For a non-loopback client openclaw
-    // enforces its pairing check (skipLocalBackendSelfPairing does NOT apply).
-    // A successful response here proves that the mcp-gateway completed real
-    // device pairing (POST /api/v1/pair) at startup and was recognised by the
-    // Gateway as a known paired device when the WS connect frame was sent.
-    // If pairing had not occurred, openclaw would have rejected the WS connect
-    // with NOT_PAIRED and this test would have failed.
+    // container DNS name — NOT via loopback.  For a non-loopback client the
+    // Gateway enforces its device-identity check (skipLocalBackendSelfPairing
+    // does NOT apply).  A successful response here proves that the Gateway
+    // recognised the mcp-gateway's Ed25519 public key as a pre-registered device
+    // (via OPENCLAW_DEVICE_PAIRING) and accepted the signed connect.challenge
+    // response.  If the public key had not been pre-registered, the Gateway
+    // would have rejected the WS connect and this test would have failed.
     try {
       const r = await client.callTool({ name: "openclaw_cron_status" });
       if (!r.isError) {

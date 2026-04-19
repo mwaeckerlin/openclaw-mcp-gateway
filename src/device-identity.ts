@@ -28,12 +28,42 @@ export function generateDeviceIdentity(): DeviceIdentity {
 }
 
 /**
+ * Load device identity from the `OPENCLAW_DEVICE_IDENTITY` environment variable.
+ *
+ * The variable must contain a JSON-encoded `DeviceIdentity` object:
+ * `{"deviceId":"…","publicKeyRaw":"…","privateKeyPem":"…"}`.
+ *
+ * Returns `undefined` when the variable is not set or its value is not a valid
+ * `DeviceIdentity`.  The caller should then fall back to file-based loading.
+ */
+export function loadDeviceIdentityFromEnv(): DeviceIdentity | undefined {
+  const raw = process.env.OPENCLAW_DEVICE_IDENTITY?.trim();
+  if (!raw) return undefined;
+  try {
+    const data = JSON.parse(raw) as Record<string, unknown>;
+    if (
+      typeof data.deviceId === "string" &&
+      data.deviceId.length > 0 &&
+      typeof data.publicKeyRaw === "string" &&
+      data.publicKeyRaw.length > 0 &&
+      typeof data.privateKeyPem === "string" &&
+      data.privateKeyPem.startsWith("-----")
+    ) {
+      return data as unknown as DeviceIdentity;
+    }
+  } catch {
+    // Fall through — caller will use file-based identity.
+  }
+  return undefined;
+}
+
+/**
  * Load the device identity from `filePath` if it exists and is valid, otherwise
  * generate a fresh one and write it to `filePath` (0600) for future runs.
  *
- * A stable device identity is required so the Gateway can recognise and pair
- * this device across reconnects.  Ephemeral identities (new key per call)
- * always appear as unknown devices and fail the Gateway's pairing check.
+ * A stable device identity is required so the Gateway can recognise this device
+ * using the public key registered via `OPENCLAW_DEVICE_PAIRING`.  Ephemeral
+ * identities (new key per call) always appear as unknown devices.
  */
 export function loadOrCreateDeviceIdentity(filePath: string): DeviceIdentity {
   if (existsSync(filePath)) {
