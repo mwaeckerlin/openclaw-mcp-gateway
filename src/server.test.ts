@@ -261,6 +261,51 @@ test("runAllowedToolWithArguments includes error details from JSON gateway error
   });
 });
 
+test("runAllowedToolWithArguments dispatches openclaw_status via status RPC family", async () => {
+  const ws = new FakeWebSocket();
+  rpcTesting.setWebSocketFactory(() => ws);
+
+  const promise = runAllowedToolWithArguments("openclaw_status", { type: "default" }, TEST_CONFIG);
+
+  ws.emitOpen();
+  ws.emitMessage({ type: "event", event: "connect.challenge" });
+  const connectFrame = parseFrame(ws.sent[0]!);
+  ws.emitMessage({ type: "res", id: connectFrame.id, ok: true, payload: {} });
+  const methodFrame = parseFrame(ws.sent[1]!);
+  assert.equal(methodFrame.method, "status");
+  ws.emitMessage({
+    type: "res",
+    id: methodFrame.id,
+    ok: true,
+    payload: { runtimeVersion: "2026.4.15", sessions: { total: 0 } }
+  });
+
+  const parsed = JSON.parse(await promise);
+  assert.equal(parsed.type, "default");
+  assert.equal(parsed.status.runtimeVersion, "2026.4.15");
+  rpcTesting.resetWebSocketFactory();
+});
+
+test("runAllowedToolWithArguments rejects openclaw_logs follow mode", async () => {
+  await assert.rejects(
+    runAllowedToolWithArguments("openclaw_logs", { follow: true }, TEST_CONFIG),
+    (error: unknown) =>
+      error instanceof McpError &&
+      error.code === ErrorCode.InvalidParams &&
+      /follow mode is not supported/i.test(error.message)
+  );
+});
+
+test("runAllowedToolWithArguments blocks sensitive config_get path", async () => {
+  await assert.rejects(
+      runAllowedToolWithArguments("openclaw_config_get", { path: "channels.telegram.token" }, TEST_CONFIG),
+      (error: unknown) =>
+        error instanceof McpError &&
+        error.code === ErrorCode.InvalidParams &&
+        /secret-bearing config paths are blocked/i.test(error.message)
+  );
+});
+
 // ---------------------------------------------------------- skills RPC tool tests
 
 test("runAllowedToolWithArguments dispatches openclaw_skills_list via skills.status RPC", async () => {

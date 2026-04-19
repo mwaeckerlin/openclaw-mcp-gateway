@@ -77,7 +77,11 @@ const TOOL_NAMES: ReadonlyRpcToolName[] = [
   "openclaw_system_presence"
 ];
 
-const SECRET_KEY_RE = /(token|secret|password|authorization|api[_-]?key|private[_-]?key|signature|cookie|session[_-]?key)/i;
+const SECRET_KEY_RE =
+  /(token|secret|password|authorization|api[_-]?key|private[_-]?key|signature|cookie|session[_-]?key|credential|access[_-]?key|client[_-]?secret|refresh[_-]?token)/i;
+const MAX_ARRAY_ELEMENTS_FOR_REDACTION = 300;
+const CHANNEL_LOGS_FETCH_OVERSAMPLING_FACTOR = 4;
+const CHANNEL_LOGS_BYTES_PER_LINE_ESTIMATE = 4_000;
 
 export const READONLY_RPC_TOOL_DEFINITIONS: Array<{
   name: ReadonlyRpcToolName;
@@ -180,6 +184,11 @@ function parseDurationMs(raw?: string): number | undefined {
   return amount * factor;
 }
 
+function isNodeConnected(entry: JsonObject): boolean {
+  // Different gateway/runtime versions expose connectivity as connected/online/status.
+  return entry.connected === true || entry.online === true || entry.status === "connected";
+}
+
 function redactString(value: string): string {
   return value
     .replace(/Bearer\s+[A-Za-z0-9._\-+/=]+/gi, "Bearer [REDACTED]")
@@ -188,7 +197,8 @@ function redactString(value: string): string {
 
 export function redactSensitive(value: unknown): unknown {
   if (typeof value === "string") return redactString(value);
-  if (Array.isArray(value)) return value.slice(0, 300).map((entry) => redactSensitive(entry));
+  // Arrays are bounded intentionally to prevent unbounded payload growth in diagnostics responses.
+  if (Array.isArray(value)) return value.slice(0, MAX_ARRAY_ELEMENTS_FOR_REDACTION).map((entry) => redactSensitive(entry));
   if (isObject(value)) {
     const out: JsonObject = {};
     for (const [key, child] of Object.entries(value)) {
@@ -252,6 +262,7 @@ export function validateReadonlyRpcToolArguments(toolName: ReadonlyRpcToolName, 
       readString(args, "target");
       break;
     case "openclaw_channels_resolve": {
+      // Runtime guard in addition to schema-level constraints.
       const entries = readStringArray(args, "entries", 50);
       if (!entries || entries.length === 0) throw new Error("arguments.entries must contain at least one entry");
       readString(args, "channel");
@@ -360,7 +371,7 @@ function ensureSafeConfigPath(path: string): void {
     .split(/[.\[\]]+/)
     .filter(Boolean)
     .some((part) => SECRET_KEY_RE.test(part));
-  if (sensitive) throw new McpError(ErrorCode.InvalidParams, "Sensitive config paths are blocked");
+  if (sensitive) throw new McpError(ErrorCode.InvalidParams, "Secret-bearing config paths are blocked");
 }
 
 export async function runReadonlyRpcToolWithArguments(
@@ -483,9 +494,14 @@ export async function runReadonlyRpcToolWithArguments(
           kind: args.kind
         }, 20_000, deviceIdentity)), null, 2);
       case "openclaw_channels_logs": {
-        const payload = asObject(await rpc(gatewayConfig, toolName, "logs.tail", { limit: 5000, maxBytes: 1_000_000 }, 12_000, deviceIdentity));
-        const channel = typeof args.channel === "string" ? args.channel : "all";
         const linesLimit = (args.lines as number | undefined) ?? 200;
+        const fetchLimit = Math.min(5000, Math.max(200, linesLimit * CHANNEL_LOGS_FETCH_OVERSAMPLING_FACTOR));
+        const fetchMaxBytes = Math.min(
+          1_000_000,
+          Math.max(100_000, linesLimit * CHANNEL_LOGS_FETCH_OVERSAMPLING_FACTOR * CHANNEL_LOGS_BYTES_PER_LINE_ESTIMATE)
+        );
+        const payload = asObject(await rpc(gatewayConfig, toolName, "logs.tail", { limit: fetchLimit, maxBytes: fetchMaxBytes }, 12_000, deviceIdentity));
+        const channel = typeof args.channel === "string" ? args.channel : "all";
         const lines = Array.isArray(payload.lines) ? payload.lines : [];
         const filtered = lines
           .map((line) => String(line))
@@ -576,6 +592,7 @@ export async function runReadonlyRpcToolWithArguments(
         const nodes = Array.isArray(listPayload.nodes) ? listPayload.nodes.map((entry) => asObject(entry)) : [];
         const paired = Array.isArray(pairPayload.paired) ? pairPayload.paired.map((entry) => asObject(entry)) : [];
         const connectedMap = new Map(nodes.map((entry) => [String(entry.nodeId ?? ""), entry]));
+        const pairedByNodeId = new Map(paired.map((entry) => [String(entry.nodeId ?? ""), entry]));
         const filteredPaired = paired.filter((entry) => {
           const nodeId = String(entry.nodeId ?? "");
           const connected = connectedMap.get(nodeId);
@@ -587,12 +604,25 @@ export async function runReadonlyRpcToolWithArguments(
           return true;
         });
         if (toolName === "openclaw_nodes_status") {
-          const filteredConnected = nodes.filter((entry) => {
+          const filteredNodes = nodes.filter((entry) => {
             const nodeId = String(entry.nodeId ?? "");
-            if (connectedOnly && !connectedMap.has(nodeId)) return false;
+            const connected = isNodeConnected(entry);
+            if (connectedOnly && !connected) return false;
+            if (sinceMs !== undefined) {
+              const pairedEntry = pairedByNodeId.get(nodeId);
+              const nodeLastConnected =
+                typeof entry.lastConnectedAt === "number"
+                  ? entry.lastConnectedAt
+                  : typeof entry.lastSeenAt === "number"
+                    ? entry.lastSeenAt
+                    : typeof pairedEntry?.lastConnectedAt === "number"
+                      ? pairedEntry.lastConnectedAt
+                      : undefined;
+              if (nodeLastConnected === undefined || now - nodeLastConnected > sinceMs) return false;
+            }
             return true;
           });
-          return JSON.stringify(redactSensitive({ ts: listPayload.ts ?? Date.now(), nodes: filteredConnected }), null, 2);
+          return JSON.stringify(redactSensitive({ ts: listPayload.ts ?? Date.now(), nodes: filteredNodes }), null, 2);
         }
         return JSON.stringify(redactSensitive({ pending: pairPayload.pending ?? [], paired: filteredPaired }), null, 2);
       }

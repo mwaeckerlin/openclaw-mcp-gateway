@@ -211,7 +211,7 @@ async function main() {
         } else {
           try {
             const parsed = JSON.parse(text.text);
-            if (parsed && typeof parsed.status === "object" && parsed.status !== null) {
+            if (typeof parsed.status === "object" && parsed.status !== null) {
               pass("openclaw_status → returned status object");
             } else {
               fail("openclaw_status → missing expected status object", text.text.slice(0, 200));
@@ -234,7 +234,7 @@ async function main() {
         const text = firstTextContent(r.content);
         if (text) {
           const parsed = JSON.parse(text.text);
-          if (typeof parsed.ok === "boolean" || typeof parsed.durationMs === "number") pass("openclaw_health → returned health payload");
+          if (parsed.ok === true && typeof parsed.durationMs === "number") pass("openclaw_health → returned healthy payload");
           else fail("openclaw_health → unexpected payload", text.text.slice(0, 200));
         } else fail("openclaw_health → no text content", JSON.stringify(r));
       } else {
