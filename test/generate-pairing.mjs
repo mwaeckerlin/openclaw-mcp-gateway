@@ -20,7 +20,7 @@
  * This script is run automatically by the `npm test` E2E step.
  */
 
-import { createHash, generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,10 +45,41 @@ const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
 // Device identity consumed by the MCP gateway (OPENCLAW_DEVICE_IDENTITY).
 const deviceIdentity = { deviceId, publicKeyRaw, privateKeyPem };
 
-// Pairing record consumed by the OpenClaw Gateway (OPENCLAW_DEVICE_PAIRING).
-// The gateway uses this to pre-register the device public key so the first
-// WS connect from the MCP gateway passes the pairing check directly.
-const devicePairing = { deviceId, publicKey: publicKeyRaw };
+// Full paired-device record consumed by the OpenClaw Gateway via
+// OPENCLAW_DEVICE_PAIRING.  The entrypoint writes this verbatim to
+// $OPENCLAW_STATE_DIR/devices/paired.json (keyed by deviceId).
+//
+// The gateway's WS connect auth flow checks:
+//   1. paired.publicKey === presented publicKey
+//   2. listEffectivePairedDeviceRoles(paired) includes the requested role
+//      → requires tokens[role] (non-revoked) AND roles/role includes the role
+//   3. roleScopesAllow({ role, requestedScopes, allowedScopes: approvedScopes })
+//      → approvedScopes must cover operator.admin and operator.read
+//
+// A record with only deviceId + publicKey is rejected with NOT_PAIRED because
+// listEffectivePairedDeviceRoles returns [] when tokens is empty.
+const nowMs = Date.now();
+const pairedRecord = {
+  deviceId,
+  publicKey: publicKeyRaw,
+  role: "operator",
+  roles: ["operator"],
+  scopes: ["operator.admin", "operator.read"],
+  approvedScopes: ["operator.admin", "operator.read"],
+  tokens: {
+    operator: {
+      token: randomBytes(32).toString("base64url"),
+      role: "operator",
+      scopes: ["operator.admin", "operator.read"],
+      createdAtMs: nowMs
+    }
+  },
+  createdAtMs: nowMs,
+  approvedAtMs: nowMs
+};
+
+// paired.json format: object keyed by deviceId.
+const devicePairing = { [deviceId]: pairedRecord };
 
 // Escape a JSON string value for inclusion in a shell .env file.
 // JSON.stringify produces valid JSON with escaped newlines, which is what
