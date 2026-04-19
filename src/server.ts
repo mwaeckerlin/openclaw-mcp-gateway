@@ -153,7 +153,7 @@ export async function runAllowedToolWithArguments(
 
   const operation = ALLOWED_HTTP_GATEWAY_OPERATIONS[toolName];
   const method = operation.requestKind === "check" ? "GET" : "POST";
-  const url = new URL(operation.requestKind === "check" ? "/api/v1/check" : "/tools/invoke", gatewayConfig.baseUrl);
+  const url = new URL(operation.requestKind === "check" ? "/healthz" : "/tools/invoke", gatewayConfig.baseUrl);
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), operation.timeoutMs);
 

@@ -58,7 +58,7 @@ export const ALLOWED_HTTP_GATEWAY_OPERATIONS: Record<HttpToolName, AllowedGatewa
   openclaw_gateway_status: {
     requestKind: "check",
     timeoutMs: 12_000,
-    description: "Return OpenClaw gateway status from GET /api/v1/check."
+    description: "Return OpenClaw gateway status from GET /healthz."
   }
 };
 
