@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ALLOWED_GATEWAY_OPERATIONS, loadGatewayConfig } from "./commands.js";
+import { ALLOWED_HTTP_GATEWAY_OPERATIONS, loadGatewayConfig } from "./commands.js";
 
 const ENV_KEYS = [
   "OPENCLAW_GATEWAY_URL",
@@ -34,7 +34,7 @@ function withEnv(env: Partial<Record<(typeof ENV_KEYS)[number], string>>, run: (
 }
 
 test("openclaw_status uses fixed verified /tools/invoke payload mapping", () => {
-  assert.deepEqual(ALLOWED_GATEWAY_OPERATIONS.openclaw_status, {
+  assert.deepEqual(ALLOWED_HTTP_GATEWAY_OPERATIONS.openclaw_status, {
     requestKind: "invoke",
     timeoutMs: 12_000,
     description: "Return overall OpenClaw status from the Gateway API.",

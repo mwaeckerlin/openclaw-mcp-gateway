@@ -1,9 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
+import { CronToolName, isCronToolName } from "./cron.js";
 
-export type AllowedToolName =
+export type HttpToolName =
   | "openclaw_status"
   | "openclaw_gateway_status";
+
+export type AllowedToolName = HttpToolName | CronToolName;
 
 export interface GatewayInvokePayload {
   tool: string;
@@ -41,7 +44,7 @@ export interface GatewayConfig {
   token: string;
 }
 
-export const ALLOWED_GATEWAY_OPERATIONS: Record<AllowedToolName, AllowedGatewayOperation> = {
+export const ALLOWED_HTTP_GATEWAY_OPERATIONS: Record<HttpToolName, AllowedGatewayOperation> = {
   openclaw_status: {
     requestKind: "invoke",
     timeoutMs: 12_000,
@@ -55,12 +58,16 @@ export const ALLOWED_GATEWAY_OPERATIONS: Record<AllowedToolName, AllowedGatewayO
   openclaw_gateway_status: {
     requestKind: "check",
     timeoutMs: 12_000,
-    description: "Return OpenClaw gateway status from GET /api/v1/check."
+    description: "Return OpenClaw gateway status from GET /healthz."
   }
 };
 
 export function isAllowedToolName(value: string): value is AllowedToolName {
-  return Object.hasOwn(ALLOWED_GATEWAY_OPERATIONS, value);
+  return isHttpToolName(value) || isCronToolName(value);
+}
+
+export function isHttpToolName(value: string): value is HttpToolName {
+  return Object.hasOwn(ALLOWED_HTTP_GATEWAY_OPERATIONS, value);
 }
 
 function normalizeUrl(rawUrl: string): string {
