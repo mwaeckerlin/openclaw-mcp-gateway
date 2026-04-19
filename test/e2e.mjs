@@ -68,40 +68,6 @@ function firstTextContent(content) {
   );
 }
 
-/**
- * Call a tool and accept either a valid response OR a capability-not-supported error.
- * Used for tools whose gateway RPC method may not exist in all runtime versions.
- * Returns { ok, parsed, isCapability } where:
- *   ok=true, parsed=payload, isCapability=false  → tool returned data
- *   ok=true, isCapability=true                   → capability error (method not available; not a test failure)
- *   ok=false, error=message                      → unexpected error (test failure)
- */
-async function callToolLoose(client, toolName, toolArgs = {}) {
-  try {
-    const r = await client.callTool({ name: toolName, arguments: toolArgs });
-    if (!r.isError) {
-      const text = firstTextContent(r.content);
-      if (!text) return { ok: false, error: `no text content: ${JSON.stringify(r)}` };
-      try {
-        return { ok: true, parsed: JSON.parse(text.text), isCapability: false };
-      } catch {
-        return { ok: true, parsed: text.text, isCapability: false };
-      }
-    }
-    const errText = JSON.stringify(r.content);
-    if (/not supported|capability|method_not_found|endpoint_disabled|tool_not_allowlisted/i.test(errText)) {
-      return { ok: true, isCapability: true, error: errText };
-    }
-    return { ok: false, error: errText };
-  } catch (e) {
-    const msg = e.message ?? String(e);
-    if (/not supported|capability|method_not_found|endpoint_disabled/i.test(msg)) {
-      return { ok: true, isCapability: true, error: msg };
-    }
-    return { ok: false, error: msg };
-  }
-}
-
 async function main() {
   console.log("=== OpenClaw MCP Gateway — End-to-End Tests ===");
   console.log(`Target: ${MCP_URL}\n`);
