@@ -8,33 +8,26 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import {
   ALLOWED_HTTP_GATEWAY_OPERATIONS,
+  buildHttpInvokePayload,
   GatewayConfig,
   isHttpToolName,
+  shapeHttpToolResponse,
+  validateHttpToolArguments,
   loadGatewayConfig
 } from "./commands.js";
 import { CRON_RPC_OPERATIONS, isCronToolName, validateCronToolArguments } from "./cron.js";
 import { callGatewayRpc, GatewayRpcError } from "./gateway-rpc.js";
-import { TOOL_DEFINITIONS } from "./tools.js";
+import { getToolDefinitions } from "./tools.js";
+import {
+  buildSkillsRpcParams,
+  isSkillsToolName,
+  SKILLS_RPC_OPERATIONS,
+  shapeSkillsToolResponse,
+  validateSkillsToolArguments
+} from "./skills.js";
+import { isToolDisabled, loadDisabledToolsFromEnv } from "./disabled-tools.js";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
-
-function normalizeResponseBody(response: Response, bodyText: string): string {
-  const trimmed = bodyText.trim();
-  if (!trimmed) {
-    return "(no output)";
-  }
-
-  const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
-    try {
-      return JSON.stringify(JSON.parse(trimmed), null, 2);
-    } catch {
-      return trimmed;
-    }
-  }
-
-  return bodyText.trimEnd();
-}
 
 function formatErrorBody(bodyText: string): string {
   const trimmed = bodyText.trim();
@@ -102,15 +95,20 @@ function isGatewayCapabilityError(status: number, details: string): boolean {
 }
 
 export async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): Promise<string> {
-  return runAllowedToolWithArguments(toolName, {}, gatewayConfig);
+  return runAllowedToolWithArguments(toolName, {}, gatewayConfig, new Set());
 }
 
 export async function runAllowedToolWithArguments(
   toolName: string,
   toolArguments: unknown,
-  gatewayConfig: GatewayConfig
+  gatewayConfig: GatewayConfig,
+  disabledTools: ReadonlySet<string> = new Set()
 ): Promise<string> {
-  if (!isHttpToolName(toolName) && !isCronToolName(toolName)) {
+  if (isToolDisabled(toolName, disabledTools)) {
+    throw new McpError(ErrorCode.InvalidParams, `Tool disabled by DISABLE_TOOLS: ${toolName}`);
+  }
+
+  if (!isHttpToolName(toolName) && !isCronToolName(toolName) && !isSkillsToolName(toolName)) {
     throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
   }
 
@@ -151,7 +149,54 @@ export async function runAllowedToolWithArguments(
     }
   }
 
+  if (isSkillsToolName(toolName)) {
+    const operation = SKILLS_RPC_OPERATIONS[toolName];
+    let params: Record<string, unknown>;
+    let validatedArguments: Record<string, unknown>;
+    try {
+      validatedArguments = validateSkillsToolArguments(toolName, toolArguments);
+      params = buildSkillsRpcParams(toolName, validatedArguments);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new McpError(ErrorCode.InvalidParams, `Validation mismatch: ${message}`);
+    }
+
+    try {
+      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs);
+      return shapeSkillsToolResponse(toolName, payload, validatedArguments);
+    } catch (error: unknown) {
+      if (error instanceof GatewayRpcError) {
+        if (error.kind === "capability") {
+          throw new McpError(
+            ErrorCode.InternalError,
+            `${toolName} is not supported by the current Gateway RPC capability`
+          );
+        }
+        if (error.kind === "auth") {
+          throw new McpError(ErrorCode.InternalError, `Gateway auth failure: ${error.message}`);
+        }
+        if (error.kind === "timeout") {
+          throw new McpError(ErrorCode.InternalError, `Gateway transport timeout: ${error.message}`);
+        }
+        if (error.kind === "protocol") {
+          throw new McpError(ErrorCode.InternalError, `Gateway protocol failure: ${error.message}`);
+        }
+        throw new McpError(ErrorCode.InternalError, `Gateway transport failure: ${error.message}`);
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new McpError(ErrorCode.InternalError, `Gateway request failed: ${message}`);
+    }
+  }
+
   const operation = ALLOWED_HTTP_GATEWAY_OPERATIONS[toolName];
+  let validatedHttpArguments: Record<string, unknown>;
+  try {
+    validatedHttpArguments = validateHttpToolArguments(toolName, toolArguments);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new McpError(ErrorCode.InvalidParams, `Validation mismatch: ${message}`);
+  }
+
   const method = operation.requestKind === "check" ? "GET" : "POST";
   const url = new URL(operation.requestKind === "check" ? "/healthz" : "/tools/invoke", gatewayConfig.baseUrl);
   const abortController = new AbortController();
@@ -160,7 +205,7 @@ export async function runAllowedToolWithArguments(
   try {
     let body: string | undefined;
     if (operation.requestKind === "invoke") {
-      body = JSON.stringify(operation.payload);
+      body = JSON.stringify(buildHttpInvokePayload(toolName, validatedHttpArguments));
     }
 
     const response = await fetch(url, {
@@ -200,7 +245,7 @@ export async function runAllowedToolWithArguments(
       );
     }
 
-    return normalizeResponseBody(response, responseText);
+    return shapeHttpToolResponse(toolName, response, responseText, validatedHttpArguments);
   } catch (error: unknown) {
     if (error instanceof McpError) {
       throw error;
@@ -220,7 +265,7 @@ export async function runAllowedToolWithArguments(
   }
 }
 
-function createMcpServer(gatewayConfig: GatewayConfig): Server {
+function createMcpServer(gatewayConfig: GatewayConfig, disabledTools: ReadonlySet<string>): Server {
   const server = new Server(
     {
       name: "openclaw-mcp-gateway",
@@ -234,18 +279,27 @@ function createMcpServer(gatewayConfig: GatewayConfig): Server {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: TOOL_DEFINITIONS
+    tools: getToolDefinitions(disabledTools)
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const toolName = request.params.name;
 
-    if (!isHttpToolName(toolName) && !isCronToolName(toolName)) {
+    if (isToolDisabled(toolName, disabledTools)) {
+      throw new McpError(ErrorCode.InvalidParams, `Tool disabled by DISABLE_TOOLS: ${toolName}`);
+    }
+
+    if (!isHttpToolName(toolName) && !isCronToolName(toolName) && !isSkillsToolName(toolName)) {
       throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
     }
 
     try {
-      const output = await runAllowedToolWithArguments(toolName, request.params.arguments, gatewayConfig);
+      const output = await runAllowedToolWithArguments(
+        toolName,
+        request.params.arguments,
+        gatewayConfig,
+        disabledTools
+      );
       return {
         content: [
           {
@@ -310,7 +364,8 @@ function respondJson(res: ServerResponse, statusCode: number, body: Record<strin
 async function handleMcpHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  gatewayConfig: GatewayConfig
+  gatewayConfig: GatewayConfig,
+  disabledTools: ReadonlySet<string>
 ): Promise<void> {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
@@ -327,7 +382,7 @@ async function handleMcpHttpRequest(
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined
   });
-  const server = createMcpServer(gatewayConfig);
+  const server = createMcpServer(gatewayConfig, disabledTools);
 
   try {
     await server.connect(transport);
@@ -340,11 +395,12 @@ async function handleMcpHttpRequest(
 
 export async function main(): Promise<void> {
   const gatewayConfig = loadGatewayConfig();
+  const disabledTools = loadDisabledToolsFromEnv();
   const port = getMcpListenPort();
   const host = getMcpListenHost();
 
   const httpServer = createServer((req, res) => {
-    void handleMcpHttpRequest(req, res, gatewayConfig).catch((error: unknown) => {
+    void handleMcpHttpRequest(req, res, gatewayConfig, disabledTools).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`HTTP request handling failed: ${message}`);
 

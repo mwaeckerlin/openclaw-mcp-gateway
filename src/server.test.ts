@@ -94,10 +94,58 @@ test("runAllowedToolWithArguments returns (no output) for empty 200 body", async
 });
 
 test("runAllowedToolWithArguments returns formatted JSON for openclaw_status on 200", async () => {
-  const body = { sessions: [{ id: "s1" }] };
+  const body = {
+    ok: true,
+    result: {
+      details: {
+        count: 2,
+        sessions: [
+          { sessionKey: "main", kind: "main", model: "gpt-5.4", filePath: "/hidden" },
+          { sessionKey: "child", kind: "cron" }
+        ]
+      }
+    }
+  };
   await withFetch(async () => makeJsonResponse(200, body), async () => {
     const result = await runAllowedToolWithArguments("openclaw_status", {}, TEST_CONFIG);
-    assert.deepEqual(JSON.parse(result), body);
+    const parsed = JSON.parse(result);
+    assert.equal(parsed.total, 2);
+    assert.equal(parsed.returned, 2);
+    assert.equal(parsed.sessions[0].sessionKey, "main");
+    assert.equal(Object.hasOwn(parsed.sessions[0], "filePath"), false);
+  });
+});
+
+test("runAllowedToolWithArguments validates openclaw_sessions_list pagination input", async () => {
+  await assert.rejects(
+    runAllowedToolWithArguments("openclaw_sessions_list", { limit: 0 }, TEST_CONFIG),
+    (error: unknown) =>
+      error instanceof McpError &&
+      error.code === ErrorCode.InvalidParams &&
+      /validation mismatch/i.test(error.message)
+  );
+});
+
+test("runAllowedToolWithArguments returns curated openclaw_session_status fields", async () => {
+  const body = {
+    ok: true,
+    result: {
+      details: {
+        sessionKey: "main",
+        status: "active",
+        model: "gpt-5.4",
+        usage: { totalTokens: 100, internalDebug: "drop" },
+        task: { runId: "run-1", status: "running", secretPath: "/tmp/secret" }
+      }
+    }
+  };
+  await withFetch(async () => makeJsonResponse(200, body), async () => {
+    const result = await runAllowedToolWithArguments("openclaw_session_status", { sessionKey: "main" }, TEST_CONFIG);
+    const parsed = JSON.parse(result);
+    assert.equal(parsed.sessionKey, "main");
+    assert.equal(parsed.usage.totalTokens, 100);
+    assert.equal(Object.hasOwn(parsed.usage, "internalDebug"), false);
+    assert.equal(Object.hasOwn(parsed.task, "secretPath"), false);
   });
 });
 
@@ -190,6 +238,16 @@ test("runAllowedToolWithArguments throws InvalidParams McpError for unknown tool
   );
 });
 
+test("runAllowedToolWithArguments rejects disabled tools with clear error", async () => {
+  await assert.rejects(
+    runAllowedToolWithArguments("openclaw_gateway_status", {}, TEST_CONFIG, new Set(["openclaw_gateway_status"])),
+    (error: unknown) =>
+      error instanceof McpError &&
+      error.code === ErrorCode.InvalidParams &&
+      /disabled by DISABLE_TOOLS/i.test(error.message)
+  );
+});
+
 test("runAllowedToolWithArguments includes error details from JSON gateway error body", async () => {
   const body = { error: { code: "RATE_LIMITED", message: "too many requests" } };
   await withFetch(async () => makeJsonResponse(429, body), async () => {
@@ -201,6 +259,68 @@ test("runAllowedToolWithArguments includes error details from JSON gateway error
         /RATE_LIMITED|too many/.test(error.message)
     );
   });
+});
+
+// ---------------------------------------------------------- skills RPC tool tests
+
+test("runAllowedToolWithArguments dispatches openclaw_skills_list via skills.status RPC", async () => {
+  const ws = new FakeWebSocket();
+  rpcTesting.setWebSocketFactory(() => ws);
+
+  const promise = runAllowedToolWithArguments("openclaw_skills_list", { limit: 1 }, TEST_CONFIG);
+
+  ws.emitOpen();
+  ws.emitMessage({ type: "event", event: "connect.challenge" });
+  const connectFrame = parseFrame(ws.sent[0]!);
+  ws.emitMessage({ type: "res", id: connectFrame.id, ok: true, payload: {} });
+  const methodFrame = parseFrame(ws.sent[1]!);
+  assert.equal(methodFrame.method, "skills.status");
+  ws.emitMessage({
+    type: "res",
+    id: methodFrame.id,
+    ok: true,
+    payload: {
+      skills: [
+        { name: "weather", skillKey: "weather", description: "Weather", eligible: true, filePath: "/secret" }
+      ]
+    }
+  });
+
+  const result = JSON.parse(await promise);
+  assert.equal(result.total, 1);
+  assert.equal(result.returned, 1);
+  assert.equal(result.skills[0].name, "weather");
+  assert.equal(Object.hasOwn(result.skills[0], "filePath"), false);
+  rpcTesting.resetWebSocketFactory();
+});
+
+test("runAllowedToolWithArguments returns selected skill detail", async () => {
+  const ws = new FakeWebSocket();
+  rpcTesting.setWebSocketFactory(() => ws);
+
+  const promise = runAllowedToolWithArguments("openclaw_skills_detail", { skillKey: "weather" }, TEST_CONFIG);
+
+  ws.emitOpen();
+  ws.emitMessage({ type: "event", event: "connect.challenge" });
+  const connectFrame = parseFrame(ws.sent[0]!);
+  ws.emitMessage({ type: "res", id: connectFrame.id, ok: true, payload: {} });
+  const methodFrame = parseFrame(ws.sent[1]!);
+  ws.emitMessage({
+    type: "res",
+    id: methodFrame.id,
+    ok: true,
+    payload: {
+      skills: [
+        { name: "calendar", skillKey: "calendar", description: "Calendar" },
+        { name: "weather", skillKey: "weather", description: "Weather" }
+      ]
+    }
+  });
+
+  const result = JSON.parse(await promise);
+  assert.equal(methodFrame.method, "skills.status");
+  assert.equal(result.skillKey, "weather");
+  rpcTesting.resetWebSocketFactory();
 });
 
 // ---------------------------------------------------------- cron RPC tool tests
