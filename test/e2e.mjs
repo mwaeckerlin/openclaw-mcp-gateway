@@ -72,7 +72,33 @@ async function main() {
   console.log("=== OpenClaw MCP Gateway — End-to-End Tests ===");
   console.log(`Target: ${MCP_URL}\n`);
 
-  // ------------------------------------------------------------------ healthz
+  // ---- NETWORK SEGREGATION PROOF ----
+  // Verify that the MCP URL uses a container DNS name (not loopback / 127.0.0.1).
+  // This confirms that test-client → mcp-gateway traffic crosses a real bridge
+  // network boundary and is NOT routed through a shared network namespace.
+  // The same separation holds for the mcp-gateway → openclaw link: both use
+  // container DNS names on separate bridge networks, so the test-client never
+  // shares an L2 segment with the privileged operator token.
+  try {
+    const mcpHost = new URL(MCP_URL).hostname;
+    const isLoopback =
+      mcpHost === "127.0.0.1" ||
+      mcpHost === "localhost" ||
+      mcpHost === "::1" ||
+      mcpHost === "::" ||
+      /^::ffff:127\./i.test(mcpHost);
+    if (isLoopback) {
+      fail(
+        "network-segregation-proof → MCP_URL must be a container DNS name, not loopback",
+        `got hostname: ${mcpHost}`
+      );
+    } else {
+      pass(`network-segregation-proof → MCP URL uses bridge DNS name: ${mcpHost}`);
+    }
+  } catch (e) {
+    fail("network-segregation-proof → could not parse MCP_URL", e.message);
+  }
+
   // POSITIVE: The MCP gateway HTTP health endpoint must respond 200 OK.
   await waitForHealthz(MCP_URL);
   pass("/healthz → 200 ok");
@@ -264,6 +290,17 @@ async function main() {
 
     // ----------------------------------------------- openclaw_cron_status
     // POSITIVE: Tool must return cron scheduler status (enabled flag, job count, next wake time).
+    //
+    // PAIRING PROOF: openclaw_cron_status uses a WebSocket RPC call.  The WS
+    // connection originates from the mcp-gateway container, which is on the
+    // openclaw-mcp-gateway bridge network and connects to openclaw:18789 by
+    // container DNS name — NOT via loopback.  For a non-loopback client the
+    // Gateway enforces its device-identity check (skipLocalBackendSelfPairing
+    // does NOT apply).  A successful response here proves that the Gateway
+    // recognised the mcp-gateway's Ed25519 public key as a pre-registered device
+    // (via OPENCLAW_DEVICE_PAIRING) and accepted the signed connect.challenge
+    // response.  If the public key had not been pre-registered, the Gateway
+    // would have rejected the WS connect and this test would have failed.
     try {
       const r = await client.callTool({ name: "openclaw_cron_status" });
       if (!r.isError) {

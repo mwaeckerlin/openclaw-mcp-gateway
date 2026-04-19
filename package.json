@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:docker": "docker compose build",
-    "test": "tsx --test src/commands.test.ts src/cron.test.ts src/disabled-tools.test.ts src/skills.test.ts src/server.test.ts src/server.integration.test.ts && (cd test && docker compose up --build --force-recreate --remove-orphans --abort-on-container-exit --exit-code-from test-client)",
+    "test": "tsx --test src/commands.test.ts src/cron.test.ts src/disabled-tools.test.ts src/skills.test.ts src/server.test.ts src/server.integration.test.ts && node test/generate-pairing.mjs && (cd test && docker compose up --build --force-recreate --remove-orphans --abort-on-container-exit --exit-code-from test-client)",
     "start": "docker compose up --build --force-recreate --remove-orphans",
     "start:daemon": "docker compose up -d --build --force-recreate --remove-orphans",
     "dev": "tsx src/server.ts"

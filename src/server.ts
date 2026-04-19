@@ -17,6 +17,7 @@ import {
 } from "./commands.js";
 import { CRON_RPC_OPERATIONS, isCronToolName, validateCronToolArguments } from "./cron.js";
 import { callGatewayRpc, GatewayRpcError } from "./gateway-rpc.js";
+import { DeviceIdentity, loadDeviceIdentityFromEnv, loadOrCreateDeviceIdentity } from "./device-identity.js";
 import { getToolDefinitions } from "./tools.js";
 import {
   buildSkillsRpcParams,
@@ -94,15 +95,16 @@ function isGatewayCapabilityError(status: number, details: string): boolean {
   return messageSuggestsNotSupported(details);
 }
 
-export async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig): Promise<string> {
-  return runAllowedToolWithArguments(toolName, {}, gatewayConfig, new Set());
+export async function runAllowedTool(toolName: string, gatewayConfig: GatewayConfig, deviceIdentity?: DeviceIdentity): Promise<string> {
+  return runAllowedToolWithArguments(toolName, {}, gatewayConfig, new Set(), deviceIdentity);
 }
 
 export async function runAllowedToolWithArguments(
   toolName: string,
   toolArguments: unknown,
   gatewayConfig: GatewayConfig,
-  disabledTools: ReadonlySet<string> = new Set()
+  disabledTools: ReadonlySet<string> = new Set(),
+  deviceIdentity?: DeviceIdentity
 ): Promise<string> {
   if (isToolDisabled(toolName, disabledTools)) {
     throw new McpError(ErrorCode.InvalidParams, `Tool disabled by DISABLE_TOOLS: ${toolName}`);
@@ -123,7 +125,7 @@ export async function runAllowedToolWithArguments(
     }
 
     try {
-      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs);
+      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs, deviceIdentity);
       return normalizeUnknownResponseBody(payload);
     } catch (error: unknown) {
       if (error instanceof GatewayRpcError) {
@@ -162,7 +164,7 @@ export async function runAllowedToolWithArguments(
     }
 
     try {
-      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs);
+      const payload = await callGatewayRpc(gatewayConfig, operation.method, params, operation.timeoutMs, deviceIdentity);
       return shapeSkillsToolResponse(toolName, payload, validatedArguments);
     } catch (error: unknown) {
       if (error instanceof GatewayRpcError) {
@@ -265,7 +267,7 @@ export async function runAllowedToolWithArguments(
   }
 }
 
-function createMcpServer(gatewayConfig: GatewayConfig, disabledTools: ReadonlySet<string>): Server {
+function createMcpServer(gatewayConfig: GatewayConfig, disabledTools: ReadonlySet<string>, deviceIdentity: DeviceIdentity): Server {
   const server = new Server(
     {
       name: "openclaw-mcp-gateway",
@@ -298,7 +300,8 @@ function createMcpServer(gatewayConfig: GatewayConfig, disabledTools: ReadonlySe
         toolName,
         request.params.arguments,
         gatewayConfig,
-        disabledTools
+        disabledTools,
+        deviceIdentity
       );
       return {
         content: [
@@ -365,7 +368,8 @@ async function handleMcpHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
   gatewayConfig: GatewayConfig,
-  disabledTools: ReadonlySet<string>
+  disabledTools: ReadonlySet<string>,
+  deviceIdentity: DeviceIdentity
 ): Promise<void> {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
@@ -382,7 +386,7 @@ async function handleMcpHttpRequest(
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined
   });
-  const server = createMcpServer(gatewayConfig, disabledTools);
+  const server = createMcpServer(gatewayConfig, disabledTools, deviceIdentity);
 
   try {
     await server.connect(transport);
@@ -399,8 +403,17 @@ export async function main(): Promise<void> {
   const port = getMcpListenPort();
   const host = getMcpListenHost();
 
+  // Load the stable device identity.  Check the OPENCLAW_DEVICE_IDENTITY env
+  // var first (used in E2E tests where the identity is pre-generated and
+  // injected alongside the matching OPENCLAW_DEVICE_PAIRING on the Gateway).
+  // Fall back to the file-based identity for production deployments.
+  const deviceIdentity =
+    loadDeviceIdentityFromEnv() ??
+    loadOrCreateDeviceIdentity(process.env.OPENCLAW_DEVICE_FILE?.trim() || "/run/openclaw/device.json");
+  console.error(`OpenClaw MCP Gateway: device id ${deviceIdentity.deviceId.slice(0, 16)}…`);
+
   const httpServer = createServer((req, res) => {
-    void handleMcpHttpRequest(req, res, gatewayConfig, disabledTools).catch((error: unknown) => {
+    void handleMcpHttpRequest(req, res, gatewayConfig, disabledTools, deviceIdentity).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`HTTP request handling failed: ${message}`);
 

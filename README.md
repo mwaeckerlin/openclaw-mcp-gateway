@@ -57,16 +57,55 @@ mcp -up-> gateway    : forward verified calls
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENCLAW_GATEWAY_URL` | yes | Base URL of the OpenClaw Gateway, e.g. `http://localhost:18789` |
+| `OPENCLAW_GATEWAY_URL` | no | Base URL of the OpenClaw Gateway (default: `http://openclaw:18789`) |
 | `OPENCLAW_GATEWAY_TOKEN` | yes* | Bearer token for Gateway authentication |
-| `OPENCLAW_GATEWAY_KEY` | yes* | Legacy alias for `OPENCLAW_GATEWAY_TOKEN` |
+| `OPENCLAW_GATEWAY_KEY` | no | Deprecated alias for `OPENCLAW_GATEWAY_TOKEN` |
 | `OPENCLAW_MCP_HOST` | no | Host to bind (default: `0.0.0.0`) |
 | `OPENCLAW_MCP_PORT` | no | Port to listen on (default: `4000`) |
+| `OPENCLAW_DEVICE_IDENTITY` | no | JSON-encoded `DeviceIdentity` object (overrides `OPENCLAW_DEVICE_FILE`) |
+| `OPENCLAW_DEVICE_FILE` | no | Path to the persistent device identity file (default: `/run/openclaw/device.json`) |
 | `DISABLE_TOOLS` | no | Disable specific MCP tools by exact name (comma and/or whitespace separated) |
 
-\* One of `OPENCLAW_GATEWAY_TOKEN` or `OPENCLAW_GATEWAY_KEY` is required. In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
+\* In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
 
-Cron MCP tools use Gateway WebSocket RPC on the same Gateway base URL (`OPENCLAW_GATEWAY_URL`), converted internally from `http(s)` to `ws(s)`.
+Cron and Skills MCP tools use Gateway WebSocket RPC on the same Gateway base URL (`OPENCLAW_GATEWAY_URL`), converted internally from `http(s)` to `ws(s)`.
+
+### Gateway device pairing
+
+WebSocket RPC tools (`openclaw_cron_*`, `openclaw_skills_*`) authenticate to the OpenClaw Gateway using an **Ed25519 device identity** during the `connect.challenge` handshake.  The flow is:
+
+1. **Device identity**: the MCP gateway holds a stable Ed25519 key pair.  At startup it reads it from:
+   - `OPENCLAW_DEVICE_IDENTITY` env var (JSON string `{"deviceId":"…","publicKeyRaw":"…","privateKeyPem":"…"}`), or
+   - the file at `OPENCLAW_DEVICE_FILE` (default `/run/openclaw/device.json`).  
+   If neither exists a new key pair is generated and written to the file path.
+
+2. **Pre-provisioned pairing**: before starting the MCP gateway, the same device public key must be registered in the OpenClaw Gateway via the `OPENCLAW_DEVICE_PAIRING` env var on the Gateway side:
+   ```json
+   {"deviceId":"…","publicKey":"…"}
+   ```
+   This tells the Gateway to trust connections that present a valid signature from the matching private key.
+
+3. **WS connect**: when a WebSocket RPC call is needed the MCP gateway opens a WS connection, receives a `connect.challenge` event from the Gateway, signs the challenge nonce with its private key, and includes the `device` field in the `connect` request frame.  The Gateway verifies the signature against the pre-registered public key and grants the connection.
+
+**No runtime HTTP pairing calls are made.** The first WS connect succeeds directly as long as the device public key was pre-registered.
+
+> ⚠️ **Pairing is incompatible with loopback shortcuts.**
+> Do not use `network_mode: service:openclaw` or point `OPENCLAW_GATEWAY_URL` at `127.0.0.1` / `localhost`.  Those tricks rely on `skipLocalBackendSelfPairing` inside the OpenClaw Gateway and bypass the pairing check entirely.  The proper flow — stable device identity + `OPENCLAW_DEVICE_PAIRING` — works correctly over any bridge or overlay network and is required for all real deployments.
+
+### Network segregation and token security
+
+> ⚠️ **Security: the MCP client and the OpenClaw Gateway must not share a network segment.**
+
+Use **two separate bridge (or overlay) networks**:
+
+```
+[openclaw] ←—openclaw-mcp-gateway—→ [mcp-gateway] ←—mcp-gateway-test-client—→ [AI-agent / client]
+```
+
+- `openclaw-mcp-gateway` — carries the privileged operator token.  Only `openclaw` and `mcp-gateway` are attached.
+- `mcp-gateway-test-client` (or your production equivalent) — carries MCP tool-call traffic only.  Only `mcp-gateway` and the AI-agent container are attached.
+
+**Why this matters:** if the AI agent and the OpenClaw Gateway share an L2 segment, the agent could use a packet capture tool to sniff the `Authorization: Bearer …` header that the MCP gateway sends on every HTTP and WebSocket request to the Gateway, obtaining the operator token and gaining unrestricted direct access to OpenClaw.  With separate networks the agent is never on the same segment as the token-carrying traffic, so packet capture on the client-facing network reveals no secrets.
 
 ### MCP client configuration vs tool-call parameters
 

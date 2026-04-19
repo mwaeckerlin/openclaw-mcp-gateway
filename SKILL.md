@@ -17,9 +17,11 @@ Use this skill to operate the `openclaw-mcp-gateway` service safely and effectiv
 
 1. Set `OPENCLAW_GATEWAY_URL`.
 2. Set `OPENCLAW_GATEWAY_TOKEN` (or legacy `OPENCLAW_GATEWAY_KEY`) or mount `/run/secret/openclaw_gateway_token`.
-3. Start service (`npm start` or compose).
-4. Verify `GET /healthz` returns `{ "ok": true, "status": "ready" }`.
-5. Verify MCP `tools/list` contains:
+3. Generate a stable device identity (Ed25519 keypair) and register its public key with the Gateway via `OPENCLAW_DEVICE_PAIRING` **before** starting the MCP gateway.  Use `test/generate-pairing.mjs` as a reference for the key format.
+4. Supply the device identity to the MCP gateway via `OPENCLAW_DEVICE_IDENTITY` (JSON string) or `OPENCLAW_DEVICE_FILE` (default `/run/openclaw/device.json`).
+5. Start service (`npm start` or compose).
+6. Verify `GET /healthz` returns `{ "ok": true, "status": "ready" }`.
+7. Verify MCP `tools/list` contains:
    - `openclaw_status`
    - `openclaw_gateway_status`
    - `openclaw_sessions_list`
@@ -290,8 +292,30 @@ Available only in `openclaw_cron_update.patch.state`. Used to manually correct j
 | `Validation mismatch` | Input schema rejected locally | Fix argument shape |
 | `Gateway auth failure` | Token invalid or missing | Check `OPENCLAW_GATEWAY_TOKEN` |
 | `Gateway transport timeout` | Gateway unreachable or stalled | Check `OPENCLAW_GATEWAY_URL` connectivity |
-| `Gateway protocol failure` | Malformed or non-ok RPC frame | Check Gateway version compatibility |
+| `Gateway protocol failure` | Malformed or non-ok RPC frame, or device not paired | Check Gateway version; verify `OPENCLAW_DEVICE_PAIRING` contains the correct public key |
 | `not supported by the current Gateway` | Gateway lacks required cron method | Upgrade Gateway |
+
+## Device Pairing Model
+
+The MCP gateway authenticates to the OpenClaw Gateway with a stable Ed25519 device identity during every WebSocket `connect.challenge` handshake:
+
+1. The MCP gateway holds an Ed25519 private key (from `OPENCLAW_DEVICE_IDENTITY` env var or `OPENCLAW_DEVICE_FILE`).
+2. The Gateway must have the matching public key pre-registered via `OPENCLAW_DEVICE_PAIRING` before the MCP gateway starts.
+3. On each WS RPC call: Gateway issues a challenge nonce → MCP gateway signs it → Gateway verifies against the pre-registered public key → connection granted.
+
+**There is no runtime HTTP pairing call.** The first WS connect succeeds directly if the public key is pre-registered.
+
+Use `test/generate-pairing.mjs` to generate a matching keypair for a fresh deployment.
+
+## Network Segregation (Security)
+
+Use **two separate bridge networks** — never a single shared network and never `network_mode: service:…`:
+
+```
+[openclaw] ←—openclaw-mcp-gateway—→ [mcp-gateway] ←—client-network—→ [AI agent / client]
+```
+
+The client must **not** share a network segment with the openclaw container.  If it does, the client can sniff the `Authorization: Bearer …` header on the token-carrying network segment and obtain the operator token directly.
 
 ## Safe Operating Rules
 

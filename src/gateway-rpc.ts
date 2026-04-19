@@ -1,12 +1,13 @@
 import {
-  createHash,
   createPrivateKey,
-  generateKeyPairSync,
   randomUUID,
   sign as cryptoSign
 } from "node:crypto";
 import WebSocket, { RawData } from "ws";
 import { GatewayConfig } from "./commands.js";
+import { DeviceIdentity, generateDeviceIdentity } from "./device-identity.js";
+
+export type { DeviceIdentity };
 
 type GatewayRpcFrame = Record<string, unknown>;
 
@@ -48,35 +49,6 @@ interface WebSocketLike {
 
 const DEFAULT_SCOPE = ["operator.admin", "operator.read"];
 
-// ---- Ed25519 device identity for connect-frame scope preservation ----
-// The gateway clears scopes to [] for token-auth clients without a valid
-// device identity. We generate a fresh ephemeral key pair per call and sign
-// the challenge nonce so the gateway keeps our requested scopes intact.
-
-const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
-
-function toBase64Url(buf: Buffer): string {
-  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-interface DeviceIdentity {
-  deviceId: string;
-  publicKeyRaw: string; // base64url raw 32-byte key
-  privateKeyPem: string;
-}
-
-function generateDeviceIdentity(): DeviceIdentity {
-  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
-  const spkiDer = publicKey.export({ type: "spki", format: "der" }) as Buffer;
-  const rawPublicKey = spkiDer.subarray(ED25519_SPKI_PREFIX.length);
-  const deviceId = createHash("sha256").update(rawPublicKey).digest("hex");
-  return {
-    deviceId,
-    publicKeyRaw: toBase64Url(rawPublicKey),
-    privateKeyPem: privateKey.export({ type: "pkcs8", format: "pem" }) as string
-  };
-}
-
 // Payload format matches openclaw gateway's buildDeviceAuthPayloadV3:
 // "v3|{deviceId}|{clientId}|{clientMode}|{role}|{scopes}|{signedAtMs}|{token}|{nonce}|{platform}|{deviceFamily}"
 function buildDevicePayloadV3(
@@ -105,7 +77,8 @@ function buildDevicePayloadV3(
 
 function signDevicePayload(privateKeyPem: string, payload: string): string {
   const key = createPrivateKey(privateKeyPem);
-  return toBase64Url(cryptoSign(null, Buffer.from(payload, "utf8"), key));
+  const sig = cryptoSign(null, Buffer.from(payload, "utf8"), key);
+  return sig.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 let webSocketFactory: WebSocketFactory = (url) => new WebSocket(url, { maxPayload: 25 * 1024 * 1024 });
@@ -175,11 +148,20 @@ function toGatewayRpcError(frame: RpcResponseFrame, context: string): GatewayRpc
   return new GatewayRpcError("protocol", message);
 }
 
+/**
+ * Call a Gateway WebSocket RPC method using the supplied device identity for
+ * the signed `connect.challenge` handshake.
+ *
+ * The device must already be pre-provisioned in the Gateway (via
+ * `OPENCLAW_DEVICE_PAIRING` on the Gateway side).  There is no runtime HTTP
+ * pairing call here — the first WS connect must succeed directly.
+ */
 export async function callGatewayRpc(
   gatewayConfig: GatewayConfig,
   method: string,
   params: Record<string, unknown>,
-  timeoutMs: number
+  timeoutMs: number,
+  deviceIdentity?: DeviceIdentity
 ): Promise<unknown> {
   return await new Promise<unknown>((resolve, reject) => {
     const wsUrl = normalizeRpcUrl(gatewayConfig.baseUrl);
@@ -189,7 +171,9 @@ export async function callGatewayRpc(
     let settled = false;
     let connected = false;
     let connectSent = false;
-    const deviceIdentity = generateDeviceIdentity();
+    // Use the supplied stable identity when available; fall back to an ephemeral
+    // one only for callers that have not yet been wired to the startup identity.
+    const identity = deviceIdentity ?? generateDeviceIdentity();
 
     const stop = (error?: Error, result?: unknown): void => {
       if (settled) {
@@ -232,7 +216,7 @@ export async function callGatewayRpc(
       if (nonce) {
         const signedAtMs = Date.now();
         const payload = buildDevicePayloadV3(
-          deviceIdentity.deviceId,
+          identity.deviceId,
           scopes,
           signedAtMs,
           gatewayConfig.token,
@@ -240,9 +224,9 @@ export async function callGatewayRpc(
           process.platform
         );
         device = {
-          id: deviceIdentity.deviceId,
-          publicKey: deviceIdentity.publicKeyRaw,
-          signature: signDevicePayload(deviceIdentity.privateKeyPem, payload),
+          id: identity.deviceId,
+          publicKey: identity.publicKeyRaw,
+          signature: signDevicePayload(identity.privateKeyPem, payload),
           signedAt: signedAtMs,
           nonce
         };
