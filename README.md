@@ -80,11 +80,30 @@ WebSocket RPC tools (`openclaw_cron_*`, `openclaw_skills_*`) authenticate to the
    - the file at `OPENCLAW_DEVICE_FILE` (default `/run/openclaw/device.json`).  
    If neither exists a new key pair is generated and written to the file path.
 
-2. **Pre-provisioned pairing**: before starting the MCP gateway, the same device public key must be registered in the OpenClaw Gateway via the `OPENCLAW_DEVICE_PAIRING` env var on the Gateway side:
+2. **Pre-provisioned pairing**: before starting the MCP gateway, the same device public key must be registered in the OpenClaw Gateway via the `OPENCLAW_DEVICE_PAIRING` env var on the Gateway side.  The value must be a JSON object **keyed by `deviceId`** and contain the full paired-device record, including `role`, `roles`, `approvedScopes`, and a non-revoked `tokens.operator` entry.  A record containing only `deviceId` + `publicKey` is **rejected** by the gateway because `listEffectivePairedDeviceRoles` returns `[]` when `tokens` is absent.
    ```json
-   {"deviceId":"…","publicKey":"…"}
+   {
+     "<deviceId>": {
+       "deviceId": "<deviceId>",
+       "publicKey": "<base64url-ed25519-public-key>",
+       "role": "operator",
+       "roles": ["operator"],
+       "scopes": ["operator.admin", "operator.read"],
+       "approvedScopes": ["operator.admin", "operator.read"],
+       "tokens": {
+         "operator": {
+           "token": "<random-token>",
+           "role": "operator",
+           "scopes": ["operator.admin", "operator.read"],
+           "createdAtMs": 1234567890000
+         }
+       },
+       "createdAtMs": 1234567890000,
+       "approvedAtMs": 1234567890000
+     }
+   }
    ```
-   This tells the Gateway to trust connections that present a valid signature from the matching private key.
+   This tells the Gateway to trust connections that present a valid signature from the matching private key and grant the `operator` role with the listed scopes.  The `test/generate-pairing.mjs` helper generates this complete record automatically for E2E tests.
 
 3. **WS connect**: when a WebSocket RPC call is needed the MCP gateway opens a WS connection, receives a `connect.challenge` event from the Gateway, signs the challenge nonce with its private key, and includes the `device` field in the `connect` request frame.  The Gateway verifies the signature against the pre-registered public key and grants the connection.
 
