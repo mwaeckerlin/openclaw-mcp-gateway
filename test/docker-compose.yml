@@ -20,11 +20,8 @@ services:
       context: ..
       dockerfile: Dockerfile
     image: mwaeckerlin/openclaw-mcp-gateway
-    # Share openclaw's network namespace so the MCP gateway connects to the
-    # openclaw gateway via the openclaw Docker hostname. This makes the gateway classify us as a
-    # "direct_local" client, which enables skipLocalBackendSelfPairing for
-    # ephemeral device identities and preserves our requested operator scopes.
-    network_mode: "service:openclaw"
+    networks:
+      - e2e
     environment:
       OPENCLAW_GATEWAY_URL: http://openclaw:18789
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
@@ -43,11 +40,10 @@ services:
     build:
       context: ..
       dockerfile: test/Dockerfile
-    # Share openclaw's network namespace so the test client can reach the MCP
-    # gateway at 127.0.0.1:4000 within the shared network namespace.
-    network_mode: "service:openclaw"
+    networks:
+      - e2e
     environment:
-      OPENCLAW_E2E_MCP_URL: http://127.0.0.1:4000
+      OPENCLAW_E2E_MCP_URL: http://mcp-gateway:4000
     depends_on:
       mcp-gateway:
         condition: service_healthy
