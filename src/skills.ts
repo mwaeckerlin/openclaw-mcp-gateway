@@ -205,7 +205,7 @@ function sanitizeSkill(value: unknown): JsonObject | undefined {
   return Object.keys(skill).length > 0 ? skill : undefined;
 }
 
-function normalizePagingInteger(value: unknown, fallback: number, minimum: number, maximum: number): number {
+function clampPagingInteger(value: unknown, fallback: number, minimum: number, maximum: number): number {
   if (typeof value !== "number" || !Number.isInteger(value)) {
     return fallback;
   }
@@ -305,8 +305,8 @@ export function shapeSkillsToolResponse(
       return name.includes(query) || key.includes(query) || description.includes(query);
     });
 
-    const limit = normalizePagingInteger(validatedArguments.limit, 25, 1, 100);
-    const offset = normalizePagingInteger(validatedArguments.offset, 0, 0, 1_000);
+    const limit = clampPagingInteger(validatedArguments.limit, 25, 1, 100);
+    const offset = clampPagingInteger(validatedArguments.offset, 0, 0, 1_000);
 
     return JSON.stringify(
       {
@@ -345,11 +345,16 @@ export function shapeSkillsToolResponse(
 const stringSchema = { type: "string" } as const;
 const nonEmptyStringSchema = { type: "string", minLength: 1 } as const;
 const boolSchema = { type: "boolean" } as const;
-const integerSchema = (minimum?: number, maximum?: number) => ({
-  type: "integer",
-  ...(minimum !== undefined ? { minimum } : {}),
-  ...(maximum !== undefined ? { maximum } : {})
-});
+const createIntegerSchema = (minimum?: number, maximum?: number) => {
+  const schema: Record<string, unknown> = { type: "integer" };
+  if (minimum !== undefined) {
+    schema.minimum = minimum;
+  }
+  if (maximum !== undefined) {
+    schema.maximum = maximum;
+  }
+  return schema;
+};
 
 export const SKILLS_TOOL_INPUT_SCHEMAS: Record<
   SkillsToolName,
@@ -365,8 +370,8 @@ export const SKILLS_TOOL_INPUT_SCHEMAS: Record<
     type: "object",
     properties: {
       agentId: nonEmptyStringSchema,
-      limit: integerSchema(1, 100),
-      offset: integerSchema(0, 1_000),
+      limit: createIntegerSchema(1, 100),
+      offset: createIntegerSchema(0, 1_000),
       eligible: boolSchema,
       query: nonEmptyStringSchema
     },

@@ -43,7 +43,7 @@ export interface GatewayConfig {
   token: string;
 }
 
-const SESSION_KIND_VALUES = ["main", "group", "cron", "hook", "node"] as const;
+const ALLOWED_SESSION_KINDS = ["main", "group", "cron", "hook", "node"] as const;
 
 const STATUS_SAFE_FIELDS = [
   "ok",
@@ -190,7 +190,7 @@ function readOptionalInteger(
   return raw;
 }
 
-function defaultedPositiveInteger(value: unknown, fallback: number, minimum: number, maximum: number): number {
+function clampPagingInteger(value: unknown, fallback: number, minimum: number, maximum: number): number {
   if (typeof value !== "number" || !Number.isInteger(value)) {
     return fallback;
   }
@@ -258,8 +258,8 @@ function shapeSessionsList(details: JsonObject, args: JsonObject): string {
   const sessionsRaw = Array.isArray(details.sessions) ? details.sessions : [];
   const sessions = sessionsRaw.map((entry) => sanitizeSessionEntry(entry)).filter((entry): entry is JsonObject => Boolean(entry));
 
-  const limit = defaultedPositiveInteger(args.limit, 20, 1, 100);
-  const offset = defaultedPositiveInteger(args.offset, 0, 0, 1_000);
+  const limit = clampPagingInteger(args.limit, 20, 1, 100);
+  const offset = clampPagingInteger(args.offset, 0, 0, 1_000);
   const paged = sessions.slice(offset, offset + limit);
 
   return JSON.stringify(
@@ -321,8 +321,8 @@ function validateOpenclawSessionsListArgs(rawArguments: unknown): JsonObject {
   assertAllowedKeys(args, "arguments", ["kind", "activeMinutes", "limit", "offset"]);
 
   const kind = readOptionalString(args, "kind", "arguments");
-  if (kind && !SESSION_KIND_VALUES.includes(kind as (typeof SESSION_KIND_VALUES)[number])) {
-    throw new Error(`arguments.kind must be one of: ${SESSION_KIND_VALUES.join(", ")}`);
+  if (kind && !ALLOWED_SESSION_KINDS.includes(kind as (typeof ALLOWED_SESSION_KINDS)[number])) {
+    throw new Error(`arguments.kind must be one of: ${ALLOWED_SESSION_KINDS.join(", ")}`);
   }
 
   readOptionalInteger(args, "activeMinutes", "arguments", 1, 10_080);

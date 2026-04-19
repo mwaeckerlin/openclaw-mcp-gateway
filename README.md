@@ -14,10 +14,10 @@ Allows the SSH-sandboxed AI agent to:
  - **`openclaw_sessions_list` / `openclaw_session_status`:** read-only session visibility with explicit validation and bounded output.
  - **`openclaw_skills_list` / `openclaw_skills_detail`:** read-only skill visibility with curated metadata only.
  - **`openclaw_cron_status` / `openclaw_cron_list`:** inspect the cron scheduler and its jobs.
-  - **`openclaw_cron_add` / `openclaw_cron_update` / `openclaw_cron_remove`:** manage `cron` and `at` jobs — set up jobs to be executed once or repeatedly at a specific time.  
+ - **`openclaw_cron_add` / `openclaw_cron_update` / `openclaw_cron_remove`:** manage `cron` and `at` jobs — set up jobs to be executed once or repeatedly at a specific time.  
    For example, instruct your agent:
    > "Send me a daily weather report from my location **every day at 8 am** in Telegram chat."
-  - **`openclaw_cron_run` / `openclaw_cron_runs`:** trigger a job on demand and inspect its execution history.
+ - **`openclaw_cron_run` / `openclaw_cron_runs`:** trigger a job on demand and inspect its execution history.
 
 ### Reminder-oriented scheduling flow
 
