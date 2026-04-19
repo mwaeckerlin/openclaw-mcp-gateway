@@ -73,6 +73,7 @@ async function main() {
   console.log(`Target: ${MCP_URL}\n`);
 
   // ------------------------------------------------------------------ healthz
+  // POSITIVE: The MCP gateway HTTP health endpoint must respond 200 OK.
   await waitForHealthz(MCP_URL);
   pass("/healthz → 200 ok");
 
@@ -81,33 +82,27 @@ async function main() {
   const client = new Client({ name: "e2e-test", version: "1.0.0" });
   await client.connect(transport);
 
+  // Track the UUID of the job created by cron_add so later tests can reference it.
+  let createdJobId = null;
+
   try {
     // --------------------------------------------------------------- tools/list
+    // POSITIVE: tools/list must expose every required tool name.
     const { tools } = await client.listTools();
     const toolNames = tools.map((t) => t.name);
 
-    if (toolNames.includes("openclaw_status")) {
-      pass("tools/list → openclaw_status is present");
-    } else {
-      fail("tools/list → openclaw_status missing", `got: [${toolNames.join(", ")}]`);
-    }
-
-    if (toolNames.includes("openclaw_gateway_status")) {
-      pass("tools/list → openclaw_gateway_status is present");
-    } else {
-      fail("tools/list → openclaw_gateway_status missing", `got: [${toolNames.join(", ")}]`);
-    }
-
-    const requiredCronTools = [
+    const requiredTools = [
+      "openclaw_status",
+      "openclaw_gateway_status",
       "openclaw_cron_status",
       "openclaw_cron_list",
       "openclaw_cron_add",
       "openclaw_cron_update",
       "openclaw_cron_remove",
       "openclaw_cron_run",
-      "openclaw_cron_runs"
+      "openclaw_cron_runs",
     ];
-    for (const tool of requiredCronTools) {
+    for (const tool of requiredTools) {
       if (toolNames.includes(tool)) {
         pass(`tools/list → ${tool} is present`);
       } else {
@@ -116,8 +111,7 @@ async function main() {
     }
 
     // ------------------------------------------------- openclaw_gateway_status
-    // Calls GET /api/v1/check on the upstream gateway.
-    // Must return non-empty text response that is not an MCP error.
+    // POSITIVE: Tool must return a non-error status response from the upstream gateway.
     try {
       const r = await client.callTool({ name: "openclaw_gateway_status" });
       if (r.isError) {
@@ -129,7 +123,7 @@ async function main() {
         } else if (text) {
           fail("openclaw_gateway_status → tool returned error text", text.text);
         } else {
-          fail("openclaw_gateway_status → unexpected response", JSON.stringify(r));
+          fail("openclaw_gateway_status → no text content in response", JSON.stringify(r));
         }
       }
     } catch (e) {
@@ -137,8 +131,7 @@ async function main() {
     }
 
     // ------------------------------------------------------- openclaw_status
-    // Calls POST /tools/invoke on the upstream gateway.
-    // Must succeed and return non-empty text response.
+    // POSITIVE: Tool must return the active session list from the upstream gateway.
     try {
       const r = await client.callTool({ name: "openclaw_status" });
       if (!r.isError) {
@@ -156,7 +149,7 @@ async function main() {
     }
 
     // ----------------------------------------------- openclaw_cron_status
-    // Calls cron.status via WebSocket RPC. Must succeed and return actual status data.
+    // POSITIVE: Tool must return cron scheduler status (enabled flag, job count, next wake time).
     try {
       const r = await client.callTool({ name: "openclaw_cron_status" });
       if (!r.isError) {
@@ -174,7 +167,7 @@ async function main() {
     }
 
     // ----------------------------------------------- openclaw_cron_list
-    // Calls cron.list via WebSocket RPC. Must succeed and return a list (may be empty).
+    // POSITIVE: Tool must return the current list of cron jobs (may be empty on a fresh gateway).
     try {
       const r = await client.callTool({ name: "openclaw_cron_list" });
       if (!r.isError) {
@@ -192,7 +185,7 @@ async function main() {
     }
 
     // ----------------------------------------------- openclaw_cron_add
-    // Creates an E2E test cron job. Must succeed.
+    // POSITIVE: Tool must create a new cron job and return its UUID and metadata.
     try {
       const r = await client.callTool({
         name: "openclaw_cron_add",
@@ -207,7 +200,12 @@ async function main() {
       if (!r.isError) {
         const text = firstTextContent(r.content);
         if (text) {
-          pass(`openclaw_cron_add → ${text.text.slice(0, 120)}`);
+          try { createdJobId = JSON.parse(text.text)?.id ?? null; } catch { /* ignore */ }
+          if (createdJobId) {
+            pass(`openclaw_cron_add → job created with id=${createdJobId}`);
+          } else {
+            fail("openclaw_cron_add → response has no id field", text.text.slice(0, 120));
+          }
         } else {
           fail("openclaw_cron_add → no text content", JSON.stringify(r));
         }
@@ -218,9 +216,8 @@ async function main() {
       fail("openclaw_cron_add → unexpected exception", e.message);
     }
 
-    // ----------------------------------------------- negative: cron_add missing required fields
-    // schedule, sessionTarget, wakeMode, payload are all required; omitting them must produce
-    // a local validation error before any gateway call is made.
+    // NEGATIVE: Calling cron_add without the required 'schedule' field must be rejected
+    //           by local validation before any gateway call is made.
     try {
       const r = await client.callTool({
         name: "openclaw_cron_add",
@@ -229,47 +226,47 @@ async function main() {
       if (r.isError) {
         const errText = JSON.stringify(r.content);
         if (/validation|mismatch|required|invalid/i.test(errText)) {
-          pass(`openclaw_cron_add validation → got expected error: ${errText.slice(0, 120)}`);
+          pass("openclaw_cron_add (negative) → correctly rejects missing required fields");
         } else {
-          fail("openclaw_cron_add validation → unexpected error body", errText);
+          fail("openclaw_cron_add (negative) → unexpected error body", errText);
         }
       } else {
-        fail("openclaw_cron_add validation → expected validation error, got success", JSON.stringify(r));
+        fail("openclaw_cron_add (negative) → expected rejection, got success", JSON.stringify(r));
       }
     } catch (e) {
       if (/validation|mismatch|required|invalid/i.test(e.message ?? "")) {
-        pass(`openclaw_cron_add validation → throws expected error: ${e.message}`);
+        pass("openclaw_cron_add (negative) → correctly rejects missing required fields");
       } else {
-        fail("openclaw_cron_add validation → unexpected exception", e.message);
+        fail("openclaw_cron_add (negative) → unexpected exception", e.message);
       }
     }
 
     // ----------------------------------------------- openclaw_cron_update
-    // Patches the E2E test job. Must succeed.
-    try {
-      const r = await client.callTool({
-        name: "openclaw_cron_update",
-        arguments: {
-          jobId: E2E_JOB_NAME,
-          patch: { enabled: false }
-        }
-      });
-      if (!r.isError) {
-        const text = firstTextContent(r.content);
-        if (text) {
-          pass(`openclaw_cron_update → ${text.text.slice(0, 120)}`);
+    // POSITIVE: Tool must update the just-created job (using its UUID) and return updated fields.
+    if (!createdJobId) {
+      fail("openclaw_cron_update → skipped because cron_add did not return a job id");
+    } else {
+      try {
+        const r = await client.callTool({
+          name: "openclaw_cron_update",
+          arguments: { id: createdJobId, patch: { enabled: false } }
+        });
+        if (!r.isError) {
+          const text = firstTextContent(r.content);
+          if (text) {
+            pass(`openclaw_cron_update → ${text.text.slice(0, 120)}`);
+          } else {
+            fail("openclaw_cron_update → no text content", JSON.stringify(r));
+          }
         } else {
-          fail("openclaw_cron_update → no text content", JSON.stringify(r));
+          fail("openclaw_cron_update → expected success, got error", JSON.stringify(r.content));
         }
-      } else {
-        fail("openclaw_cron_update → expected success, got error", JSON.stringify(r.content));
+      } catch (e) {
+        fail("openclaw_cron_update → unexpected exception", e.message);
       }
-    } catch (e) {
-      fail("openclaw_cron_update → unexpected exception", e.message);
     }
 
-    // ----------------------------------------------- negative: cron_update both id and jobId
-    // Providing both id and jobId must fail validation locally (exactly one required).
+    // NEGATIVE: Providing both 'id' and 'jobId' must be rejected by local validation.
     try {
       const r = await client.callTool({
         name: "openclaw_cron_update",
@@ -278,44 +275,47 @@ async function main() {
       if (r.isError) {
         const errText = JSON.stringify(r.content);
         if (ID_VALIDATION_RE.test(errText)) {
-          pass(`openclaw_cron_update validation → got expected error: ${errText.slice(0, 120)}`);
+          pass("openclaw_cron_update (negative) → correctly rejects ambiguous id/jobId");
         } else {
-          fail("openclaw_cron_update validation → unexpected error body", errText);
+          fail("openclaw_cron_update (negative) → unexpected error body", errText);
         }
       } else {
-        fail("openclaw_cron_update validation → expected validation error, got success", JSON.stringify(r));
+        fail("openclaw_cron_update (negative) → expected rejection, got success", JSON.stringify(r));
       }
     } catch (e) {
       if (ID_VALIDATION_RE.test(e.message ?? "")) {
-        pass(`openclaw_cron_update validation → throws expected error: ${e.message}`);
+        pass("openclaw_cron_update (negative) → correctly rejects ambiguous id/jobId");
       } else {
-        fail("openclaw_cron_update validation → unexpected exception", e.message);
+        fail("openclaw_cron_update (negative) → unexpected exception", e.message);
       }
     }
 
     // ----------------------------------------------- openclaw_cron_run
-    // Triggers the E2E test job immediately. Must succeed (response may contain enqueued: true).
-    try {
-      const r = await client.callTool({
-        name: "openclaw_cron_run",
-        arguments: { jobId: E2E_JOB_NAME, mode: "force" }
-      });
-      if (!r.isError) {
-        const text = firstTextContent(r.content);
-        if (text) {
-          pass(`openclaw_cron_run → ${text.text.slice(0, 120)}`);
+    // POSITIVE: Tool must trigger the just-created job immediately and return a run result.
+    if (!createdJobId) {
+      fail("openclaw_cron_run → skipped because cron_add did not return a job id");
+    } else {
+      try {
+        const r = await client.callTool({
+          name: "openclaw_cron_run",
+          arguments: { id: createdJobId, mode: "force" }
+        });
+        if (!r.isError) {
+          const text = firstTextContent(r.content);
+          if (text) {
+            pass(`openclaw_cron_run → ${text.text.slice(0, 120)}`);
+          } else {
+            fail("openclaw_cron_run → no text content", JSON.stringify(r));
+          }
         } else {
-          fail("openclaw_cron_run → no text content", JSON.stringify(r));
+          fail("openclaw_cron_run → expected success, got error", JSON.stringify(r.content));
         }
-      } else {
-        fail("openclaw_cron_run → expected success, got error", JSON.stringify(r.content));
+      } catch (e) {
+        fail("openclaw_cron_run → unexpected exception", e.message);
       }
-    } catch (e) {
-      fail("openclaw_cron_run → unexpected exception", e.message);
     }
 
-    // ----------------------------------------------- negative: cron_run neither id nor jobId
-    // Omitting both id and jobId must fail validation locally (exactly one required).
+    // NEGATIVE: Omitting both 'id' and 'jobId' must be rejected by local validation.
     try {
       const r = await client.callTool({
         name: "openclaw_cron_run",
@@ -324,23 +324,24 @@ async function main() {
       if (r.isError) {
         const errText = JSON.stringify(r.content);
         if (ID_VALIDATION_RE.test(errText)) {
-          pass(`openclaw_cron_run validation → got expected error: ${errText.slice(0, 120)}`);
+          pass("openclaw_cron_run (negative) → correctly rejects missing id/jobId");
         } else {
-          fail("openclaw_cron_run validation → unexpected error body", errText);
+          fail("openclaw_cron_run (negative) → unexpected error body", errText);
         }
       } else {
-        fail("openclaw_cron_run validation → expected validation error, got success", JSON.stringify(r));
+        fail("openclaw_cron_run (negative) → expected rejection, got success", JSON.stringify(r));
       }
     } catch (e) {
       if (ID_VALIDATION_RE.test(e.message ?? "")) {
-        pass(`openclaw_cron_run validation → throws expected error: ${e.message}`);
+        pass("openclaw_cron_run (negative) → correctly rejects missing id/jobId");
       } else {
-        fail("openclaw_cron_run validation → unexpected exception", e.message);
+        fail("openclaw_cron_run (negative) → unexpected exception", e.message);
       }
     }
 
     // ----------------------------------------------- openclaw_cron_runs
-    // Calls cron.runs via WebSocket RPC. Must succeed and return run history.
+    // POSITIVE: Tool must return the run history for all jobs (may be empty or contain the run
+    //           triggered above).
     try {
       const r = await client.callTool({ name: "openclaw_cron_runs" });
       if (!r.isError) {
@@ -358,28 +359,32 @@ async function main() {
     }
 
     // ----------------------------------------------- openclaw_cron_remove
-    // Removes the E2E test job. Must succeed.
-    try {
-      const r = await client.callTool({
-        name: "openclaw_cron_remove",
-        arguments: { jobId: E2E_JOB_NAME }
-      });
-      if (!r.isError) {
-        const text = firstTextContent(r.content);
-        if (text) {
-          pass(`openclaw_cron_remove → ${text.text.slice(0, 120)}`);
+    // POSITIVE: Tool must delete the just-created job by UUID and confirm removal.
+    if (!createdJobId) {
+      fail("openclaw_cron_remove → skipped because cron_add did not return a job id");
+    } else {
+      try {
+        const r = await client.callTool({
+          name: "openclaw_cron_remove",
+          arguments: { id: createdJobId }
+        });
+        if (!r.isError) {
+          const text = firstTextContent(r.content);
+          if (text) {
+            pass(`openclaw_cron_remove → ${text.text.slice(0, 120)}`);
+            createdJobId = null; // successfully removed; no cleanup needed
+          } else {
+            fail("openclaw_cron_remove → no text content", JSON.stringify(r));
+          }
         } else {
-          fail("openclaw_cron_remove → no text content", JSON.stringify(r));
+          fail("openclaw_cron_remove → expected success, got error", JSON.stringify(r.content));
         }
-      } else {
-        fail("openclaw_cron_remove → expected success, got error", JSON.stringify(r.content));
+      } catch (e) {
+        fail("openclaw_cron_remove → unexpected exception", e.message);
       }
-    } catch (e) {
-      fail("openclaw_cron_remove → unexpected exception", e.message);
     }
 
-    // ----------------------------------------------- negative: cron_remove both id and jobId
-    // Providing both id and jobId must fail validation locally (exactly one required).
+    // NEGATIVE: Providing both 'id' and 'jobId' must be rejected by local validation.
     try {
       const r = await client.callTool({
         name: "openclaw_cron_remove",
@@ -388,38 +393,45 @@ async function main() {
       if (r.isError) {
         const errText = JSON.stringify(r.content);
         if (ID_VALIDATION_RE.test(errText)) {
-          pass(`openclaw_cron_remove validation → got expected error: ${errText.slice(0, 120)}`);
+          pass("openclaw_cron_remove (negative) → correctly rejects ambiguous id/jobId");
         } else {
-          fail("openclaw_cron_remove validation → unexpected error body", errText);
+          fail("openclaw_cron_remove (negative) → unexpected error body", errText);
         }
       } else {
-        fail("openclaw_cron_remove validation → expected validation error, got success", JSON.stringify(r));
+        fail("openclaw_cron_remove (negative) → expected rejection, got success", JSON.stringify(r));
       }
     } catch (e) {
       if (ID_VALIDATION_RE.test(e.message ?? "")) {
-        pass(`openclaw_cron_remove validation → throws expected error: ${e.message}`);
+        pass("openclaw_cron_remove (negative) → correctly rejects ambiguous id/jobId");
       } else {
-        fail("openclaw_cron_remove validation → unexpected exception", e.message);
+        fail("openclaw_cron_remove (negative) → unexpected exception", e.message);
       }
     }
 
     // ----------------------------------------------- negative: unknown tool
-    // The MCP gateway must reject calls to tools not in its allowlist.
+    // NEGATIVE: The MCP gateway must reject calls to tool names not in its allowlist.
     try {
       const r = await client.callTool({ name: "unknown_tool_xyz" });
-      if (r.isError || /unknown|error|invalid/i.test(JSON.stringify(r))) {
-        pass(`unknown tool → got expected error response: ${JSON.stringify(r.content)}`);
+      if (r.isError) {
+        pass("unknown tool (negative) → correctly rejects unknown tool name");
       } else {
-        fail("unknown tool → expected error response", JSON.stringify(r));
+        fail("unknown tool (negative) → expected rejection, got success", JSON.stringify(r));
       }
     } catch (e) {
-      if (/unknown|error|invalid/i.test(e.message ?? "")) {
-        pass(`unknown tool → throws expected error: ${e.message}`);
+      if (/unknown|invalid/i.test(e.message ?? "")) {
+        pass("unknown tool (negative) → correctly rejects unknown tool name");
       } else {
-        fail("unknown tool → unexpected exception", e.message);
+        fail("unknown tool (negative) → unexpected exception", e.message);
       }
     }
   } finally {
+    // Best-effort cleanup: remove the test job if it was not already removed.
+    if (createdJobId) {
+      await client.callTool({
+        name: "openclaw_cron_remove",
+        arguments: { id: createdJobId }
+      }).catch(() => {});
+    }
     await client.close().catch(() => {});
   }
 
