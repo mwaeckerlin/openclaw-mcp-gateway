@@ -20,10 +20,10 @@ Use this skill to operate the `openclaw-mcp-gateway` service safely and effectiv
 
 ## How to call MCP tools
 
-Send HTTP POST requests to `$OPENCLAW_MCP_GATEWAY_URL/mcp` using the MCP JSON-RPC protocol:
+Send HTTP POST requests to `$OPENCLAW_MCP_GATEWAY_URL` using the MCP JSON-RPC protocol:
 
 ```bash
-curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL/mcp" \
+curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
@@ -31,7 +31,7 @@ curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL/mcp" \
 To invoke a tool:
 
 ```bash
-curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL/mcp" \
+curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"openclaw_gateway_status","arguments":{}}}'
 ```
