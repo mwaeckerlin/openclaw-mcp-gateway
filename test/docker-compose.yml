@@ -27,10 +27,11 @@ services:
     # from a different IP and pairing becomes required, which breaks all RPC calls.
     network_mode: "service:openclaw"
     environment:
+      # OPENCLAW_GATEWAY_URL must stay as 127.0.0.1 here: network_mode shares
+      # openclaw's network namespace so the WS connection originates from
+      # loopback, which is required for skipLocalBackendSelfPairing.
       OPENCLAW_GATEWAY_URL: http://127.0.0.1:18789
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
-      OPENCLAW_MCP_HOST: 0.0.0.0
-      OPENCLAW_MCP_PORT: 4000
     depends_on:
       openclaw:
         condition: service_healthy

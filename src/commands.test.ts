@@ -98,7 +98,7 @@ test("shapeHttpToolResponse curates openclaw_gateway_status fields using allowli
   assert.equal(Object.hasOwn(parsed, "secret"), false);
 });
 
-test("loadGatewayConfig reads required gateway URL and token without payload env vars", () => {
+test("loadGatewayConfig reads gateway URL and token from env vars", () => {
   withEnv(
     {
       OPENCLAW_GATEWAY_URL: "https://gateway.example.invalid/",
@@ -107,6 +107,20 @@ test("loadGatewayConfig reads required gateway URL and token without payload env
     () => {
       const config = loadGatewayConfig();
       assert.equal(config.baseUrl, "https://gateway.example.invalid/");
+      assert.equal(config.token, "token-value");
+    }
+  );
+});
+
+test("loadGatewayConfig defaults OPENCLAW_GATEWAY_URL to http://openclaw:18789", () => {
+  withEnv(
+    {
+      OPENCLAW_GATEWAY_URL: undefined,
+      OPENCLAW_GATEWAY_TOKEN: "token-value"
+    },
+    () => {
+      const config = loadGatewayConfig();
+      assert.equal(config.baseUrl, "http://openclaw:18789/");
       assert.equal(config.token, "token-value");
     }
   );

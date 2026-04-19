@@ -57,7 +57,7 @@ mcp -up-> gateway    : forward verified calls
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENCLAW_GATEWAY_URL` | yes | Base URL of the OpenClaw Gateway, e.g. `http://localhost:18789` |
+| `OPENCLAW_GATEWAY_URL` | no | Base URL of the OpenClaw Gateway (default: `http://openclaw:18789`) |
 | `OPENCLAW_GATEWAY_TOKEN` | yes* | Bearer token for Gateway authentication |
 | `OPENCLAW_GATEWAY_KEY` | yes* | Legacy alias for `OPENCLAW_GATEWAY_TOKEN` |
 | `OPENCLAW_MCP_HOST` | no | Host to bind (default: `0.0.0.0`) |

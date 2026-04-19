@@ -493,10 +493,7 @@ function readSecret(
 }
 
 export function loadGatewayConfig(): GatewayConfig {
-  const baseUrlEnv = process.env.OPENCLAW_GATEWAY_URL;
-  if (!baseUrlEnv) {
-    throw new Error("OPENCLAW_GATEWAY_URL is required");
-  }
+  const baseUrlEnv = process.env.OPENCLAW_GATEWAY_URL?.trim() || "http://openclaw:18789";
 
   return {
     baseUrl: normalizeUrl(baseUrlEnv),
