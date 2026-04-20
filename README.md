@@ -55,6 +55,8 @@ mcp -up-> gateway    : forward verified calls
 > ⚠️ **Production rule: never pass secrets as environment variables.**
 > Use Docker secrets instead (mounted at `/run/secret/openclaw_gateway_token`). Environment variables can leak through log files, `/proc`, container inspection, and child processes.
 
+The variables below are read by the **MCP gateway server process** itself. See [MCP client environment](#mcp-client-environment) for the client-side variable (`OPENCLAW_MCP_GATEWAY_URL`) that belongs on the sandbox/agent container, not here.
+
 | Variable | Required | Description |
 |---|---|---|
 | `OPENCLAW_GATEWAY_URL` | no | Base URL of the OpenClaw Gateway (default: `http://openclaw:18789`) |
@@ -62,7 +64,6 @@ mcp -up-> gateway    : forward verified calls
 | `OPENCLAW_GATEWAY_KEY` | no | Deprecated alias for `OPENCLAW_GATEWAY_TOKEN` |
 | `OPENCLAW_MCP_HOST` | no | Host to bind (default: `0.0.0.0`) |
 | `OPENCLAW_MCP_PORT` | no | Port to listen on (default: `4000`) |
-| `OPENCLAW_MCP_GATEWAY_URL` | yes | URL where MCP clients (e.g. sandbox agents) reach this gateway. Set this as an environment variable on the **client side** (sandbox container), not on the MCP gateway itself. |
 | `OPENCLAW_DEVICE_IDENTITY` | no | JSON-encoded `DeviceIdentity` object (overrides `OPENCLAW_DEVICE_FILE`) |
 | `OPENCLAW_DEVICE_FILE` | no | Path to the persistent device identity file (default: `/run/openclaw/device.json`) |
 | `DISABLE_TOOLS` | no | Disable specific MCP tools by exact name (comma and/or whitespace separated) |
@@ -127,10 +128,20 @@ Use **two separate bridge (or overlay) networks**:
 
 **Why this matters:** if the AI agent and the OpenClaw Gateway share an L2 segment, the agent could use a packet capture tool to sniff the `Authorization: Bearer …` header that the MCP gateway sends on every HTTP and WebSocket request to the Gateway, obtaining the operator token and gaining unrestricted direct access to OpenClaw.  With separate networks the agent is never on the same segment as the token-carrying traffic, so packet capture on the client-facing network reveals no secrets.
 
-### MCP client configuration vs tool-call parameters
+### MCP client environment
 
-- **MCP client configuration** (for example `OPENCLAW_GATEWAY_URL`, auth token, `DISABLE_TOOLS`) controls how the gateway process itself is started and what tools are exposed.
-- **MCP client environment**: The sandbox/client container needs `OPENCLAW_MCP_GATEWAY_URL` set so the agent knows where to reach this MCP gateway. In [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw)'s `docker-compose.yml`, this is pre-configured on the sandbox service and written to `/etc/environment` so SSH sessions inherit it automatically.
+The sandbox or agent container needs to know where to reach this MCP gateway. Set the following variable on the **client side** (sandbox/agent container), not on the MCP gateway server:
+
+| Variable | Required | Description |
+|---|---|---|
+| `OPENCLAW_MCP_GATEWAY_URL` | yes | URL where MCP clients reach this gateway (e.g. `http://mcp-gateway:4000`) |
+
+In [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw)'s `docker-compose.yml` this is pre-configured on the sandbox service and written to `/etc/environment` so SSH sessions inherit it automatically.
+
+### MCP server configuration vs client environment vs tool-call parameters
+
+- **MCP gateway server configuration** (the variables in the [Configuration](#configuration) table above — `OPENCLAW_GATEWAY_URL`, auth token, `DISABLE_TOOLS`, etc.) controls how the gateway server process is started and what tools are exposed.
+- **MCP client environment** (`OPENCLAW_MCP_GATEWAY_URL`, set on the sandbox/agent container) tells the agent where to connect. It is not read by the gateway server at all.
 - **Tool-call parameters** are the validated per-call `arguments` sent by MCP clients when invoking a tool.
 - Tool-call parameters cannot override disabled tools or bypass the allowlist/validation logic.
 
