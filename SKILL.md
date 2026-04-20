@@ -11,7 +11,7 @@ MCP gateway that exposes a strict allowlist of read-only and cron-management too
 
 Use these rules when told to install this skill locally.
 
-- **Source file in this repository:** `/home/runner/work/openclaw-mcp-gateway/openclaw-mcp-gateway/SKILL.md`
+- **Source file in this repository:** `<repository-root>/SKILL.md`
 - **Canonical installed skill file (active location):** `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
 - **Any other copied file path is not an installation** (for example, temporary files or copies elsewhere in the workspace do not activate the skill).
 

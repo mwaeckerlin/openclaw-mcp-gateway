@@ -172,7 +172,7 @@ OpenClaw skills are authored as a `SKILL.md` file with YAML frontmatter (`name`,
 
 When installing the current skill locally, use these exact locations:
 
-- **Source file in this repository:** `/home/runner/work/openclaw-mcp-gateway/openclaw-mcp-gateway/SKILL.md`
+- **Source file in this repository:** `<repository-root>/SKILL.md`
 - **Canonical installed (active) skill file:** `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
 - **Any copied skill file at a different workspace path is not an installation** and does not activate this skill.
 
@@ -185,7 +185,7 @@ Installation procedure:
 
 ```bash
 mkdir -p ~/.openclaw/workspace/skills/openclaw-mcp-gateway
-cp /home/runner/work/openclaw-mcp-gateway/openclaw-mcp-gateway/SKILL.md ~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md
+cp SKILL.md ~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md
 openclaw skills list
 openclaw skills detail openclaw-mcp-gateway
 ```
