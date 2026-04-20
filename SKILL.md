@@ -41,13 +41,12 @@ curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
 7. Verify MCP `tools/list` contains:
    - normalized read-only RPC tools:
      - `openclaw_health`, `openclaw_status`, `openclaw_logs`, `openclaw_gateway_probe`, `openclaw_gateway_usage_cost`, `openclaw_doctor`
-     - `openclaw_channels_list`, `openclaw_channels_status`, `openclaw_channels_capabilities`, `openclaw_channels_resolve`, `openclaw_channels_logs`
-     - `openclaw_plugins_list`, `openclaw_plugins_inspect`, `openclaw_plugins_doctor`
+     - `openclaw_channels_list`, `openclaw_channels_status`, `openclaw_channels_logs`
      - `openclaw_models_status`, `openclaw_models_list`, `openclaw_models_aliases_list`, `openclaw_models_fallbacks_list`
-     - `openclaw_config_get`, `openclaw_config_file`, `openclaw_config_validate`, `openclaw_config_schema`, `openclaw_config_schema_lookup`
-     - `openclaw_security_audit`, `openclaw_secrets_audit`, `openclaw_approvals_get`
+     - `openclaw_config_get`, `openclaw_config_file`, `openclaw_config_validate`, `openclaw_config_schema`
+     - `openclaw_approvals_get`
      - `openclaw_devices_list`, `openclaw_nodes_list`, `openclaw_nodes_pending`, `openclaw_nodes_status`
-     - `openclaw_skills_check`, `openclaw_sandbox_explain`, `openclaw_sandbox_list`, `openclaw_system_presence`
+     - `openclaw_skills_check`, `openclaw_system_presence`
    - existing HTTP/session tools: `openclaw_gateway_status`, `openclaw_sessions_list`, `openclaw_session_status`
    - existing skills + cron tools: `openclaw_skills_list`, `openclaw_skills_detail`, `openclaw_cron_status`, `openclaw_cron_list`, `openclaw_cron_add`, `openclaw_cron_update`, `openclaw_cron_remove`, `openclaw_cron_run`, `openclaw_cron_runs`
 
@@ -66,31 +65,22 @@ curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
 - `openclaw_doctor { deep?: boolean, noWorkspaceSuggestions?: boolean }` (read-only only)
 - `openclaw_channels_list {}`
 - `openclaw_channels_status { probe?: boolean, timeoutMs?: integer[500..120000] }`
-- `openclaw_channels_capabilities { channel?: string, account?: string, target?: string }`
-- `openclaw_channels_resolve { entries: string[1..50], channel?: string, account?: string, kind?: "auto" | "user" | "group" }`
 - `openclaw_channels_logs { channel?: string, lines?: integer[1..5000] }`
-- `openclaw_plugins_list { enabledOnly?: boolean, verbose?: boolean }`
-- `openclaw_plugins_inspect { id: string }`
-- `openclaw_plugins_doctor {}`
 - `openclaw_models_status { check?: boolean, probe?: boolean, probeProvider?: string, probeProfileIds?: string[<=50], probeTimeoutMs?: integer[1000..120000], probeConcurrency?: integer[1..32], probeMaxTokens?: integer[1..32000], agentId?: string }`
 - `openclaw_models_list { agentId?: string }`
 - `openclaw_models_aliases_list {}` / `openclaw_models_fallbacks_list {}`
 - `openclaw_config_get { path: string }` (secret-bearing paths blocked)
 - `openclaw_config_file {}` / `openclaw_config_validate {}`
-- `openclaw_config_schema {}` / `openclaw_config_schema_lookup { path: string }`
-- `openclaw_security_audit { deep?: boolean }` (read-only, never fix)
-- `openclaw_secrets_audit { allowExec?: boolean, check?: boolean }` (read-only, never reveal secret values)
+- `openclaw_config_schema {}`
 - `openclaw_approvals_get { target?: "local" | "gateway" | "node", node?: string }`
 - `openclaw_devices_list {}`
 - `openclaw_nodes_list { connectedOnly?: boolean, lastConnected?: string }`
 - `openclaw_nodes_pending {}`
 - `openclaw_nodes_status { connectedOnly?: boolean, lastConnected?: string }`
 - `openclaw_skills_check {}`
-- `openclaw_sandbox_explain { sessionKey?: string, agentId?: string }`
-- `openclaw_sandbox_list { browserOnly?: boolean }`
 - `openclaw_system_presence {}`
 
-Active probe tools: `openclaw_health(verbose=true)`, `openclaw_status(type=deep|all)`, `openclaw_gateway_probe`, `openclaw_channels_status(probe=true)`, `openclaw_models_status(probe=true)`, `openclaw_security_audit(deep=true)`, `openclaw_secrets_audit(allowExec=true)`.
+Active probe tools: `openclaw_health(verbose=true)`, `openclaw_status(type=deep|all)`, `openclaw_gateway_probe`, `openclaw_channels_status(probe=true)`, `openclaw_models_status(probe=true)`.
 
 ### `openclaw_gateway_status`
 

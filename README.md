@@ -187,20 +187,15 @@ openclaw skills detail openclaw-mcp-gateway
 | `openclaw_gateway_status` | HTTP | `GET /healthz` | Curated gateway health/status fields |
 | `openclaw_channels_list` | WebSocket RPC | `config.get` (derived) | Configured channel accounts |
 | `openclaw_channels_status` | WebSocket RPC | `channels.status` | Channel runtime status with optional probes |
-| `openclaw_channels_capabilities` | WebSocket RPC | `channels.capabilities` | Channel capability hints/permissions |
-| `openclaw_channels_resolve` | WebSocket RPC | `channels.resolve` | Resolve `#channel` / `@user` names to IDs |
 | `openclaw_channels_logs` | WebSocket RPC | `logs.tail` (filtered) | Bounded channel logs with redaction |
-| `openclaw_plugins_list` / `openclaw_plugins_inspect` / `openclaw_plugins_doctor` | WebSocket RPC | `plugins.list` / `plugins.inspect` / `plugins.doctor` | Plugin inventory and diagnostics |
 | `openclaw_models_status` / `openclaw_models_list` | WebSocket RPC | `models.authStatus` / `models.list` | Model/auth/provider status and model list |
 | `openclaw_models_aliases_list` / `openclaw_models_fallbacks_list` | WebSocket RPC | `config.get` (derived) | Aliases/fallbacks from active config |
 | `openclaw_config_get` / `openclaw_config_file` / `openclaw_config_validate` | WebSocket RPC | `config.get` | Config path read (sensitive paths blocked), file path, validation summary |
-| `openclaw_config_schema` / `openclaw_config_schema_lookup` | WebSocket RPC | `config.schema` / `config.schema.lookup` | Full schema + path lookup |
-| `openclaw_security_audit` / `openclaw_secrets_audit` | WebSocket RPC | `security.audit` / `secrets.audit` | Read-only audit tools (never fix/apply) |
+| `openclaw_config_schema` | WebSocket RPC | `config.schema` | Full config schema |
 | `openclaw_approvals_get` | WebSocket RPC | `exec.approvals.get` / `exec.approvals.node.get` | Effective exec approvals snapshot |
 | `openclaw_devices_list` | WebSocket RPC | `device.pair.list` | Pending + paired devices (tokens redacted) |
 | `openclaw_nodes_list` / `openclaw_nodes_pending` / `openclaw_nodes_status` | WebSocket RPC | `node.pair.list` / `node.list` | Node list/pending/status views with optional filters |
 | `openclaw_skills_check` | WebSocket RPC | `skills.status` (derived) | Skill readiness summary |
-| `openclaw_sandbox_explain` / `openclaw_sandbox_list` | WebSocket RPC | `sandbox.explain` / `sandbox.list` | Sandbox policy/runtime visibility |
 | `openclaw_system_presence` | WebSocket RPC | `system-presence` | Current system presence entries |
 | `openclaw_sessions_list` | HTTP | `POST /tools/invoke` (tool: `sessions_list`) | Read-only session list with strict local validation and bounded paging |
 | `openclaw_session_status` | HTTP | `POST /tools/invoke` (tool: `session_status`) | Read-only status for one explicitly targeted session |
@@ -228,12 +223,7 @@ All tools reject unknown arguments and apply strict bounds/redaction.
 - `openclaw_doctor { deep?: boolean, noWorkspaceSuggestions?: boolean }`
 - `openclaw_channels_list {}`
 - `openclaw_channels_status { probe?: boolean, timeoutMs?: integer[500..120000] }`
-- `openclaw_channels_capabilities { channel?: string, account?: string, target?: string }`
-- `openclaw_channels_resolve { entries: string[1..50], channel?: string, account?: string, kind?: "auto" | "user" | "group" }`
 - `openclaw_channels_logs { channel?: string, lines?: integer[1..5000] }`
-- `openclaw_plugins_list { enabledOnly?: boolean, verbose?: boolean }`
-- `openclaw_plugins_inspect { id: string }`
-- `openclaw_plugins_doctor {}`
 - `openclaw_models_status { check?: boolean, probe?: boolean, probeProvider?: string, probeProfileIds?: string[<=50], probeTimeoutMs?: integer[1000..120000], probeConcurrency?: integer[1..32], probeMaxTokens?: integer[1..32000], agentId?: string }`
 - `openclaw_models_list { agentId?: string }`
 - `openclaw_models_aliases_list {}`
@@ -242,20 +232,15 @@ All tools reject unknown arguments and apply strict bounds/redaction.
 - `openclaw_config_file {}`
 - `openclaw_config_validate {}`
 - `openclaw_config_schema {}`
-- `openclaw_config_schema_lookup { path: string }`
-- `openclaw_security_audit { deep?: boolean }` (**read-only, never fix**)
-- `openclaw_secrets_audit { allowExec?: boolean, check?: boolean }` (**read-only, redacted**)
 - `openclaw_approvals_get { target?: "local" | "gateway" | "node", node?: string }`
 - `openclaw_devices_list {}`
 - `openclaw_nodes_list { connectedOnly?: boolean, lastConnected?: string(duration like "24h") }`
 - `openclaw_nodes_pending {}`
 - `openclaw_nodes_status { connectedOnly?: boolean, lastConnected?: string }`
 - `openclaw_skills_check {}`
-- `openclaw_sandbox_explain { sessionKey?: string, agentId?: string }`
-- `openclaw_sandbox_list { browserOnly?: boolean }`
 - `openclaw_system_presence {}`
 
-Active probe tools: `openclaw_health` (`verbose=true`), `openclaw_status` (`deep`/`all`), `openclaw_gateway_probe`, `openclaw_channels_status` (`probe=true`), `openclaw_models_status` (`probe=true`), `openclaw_security_audit` (`deep=true`), `openclaw_secrets_audit` (`allowExec=true`).
+Active probe tools: `openclaw_health` (`verbose=true`), `openclaw_status` (`deep`/`all`), `openclaw_gateway_probe`, `openclaw_channels_status` (`probe=true`), `openclaw_models_status` (`probe=true`).
 
 ### `openclaw_gateway_status`
 
