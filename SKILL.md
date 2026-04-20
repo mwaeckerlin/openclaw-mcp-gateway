@@ -38,18 +38,44 @@ curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
 
 ## Available tools
 
-Verify MCP `tools/list` contains all of the following tools:
-
-- `openclaw_health`, `openclaw_status`, `openclaw_logs`, `openclaw_gateway_probe`, `openclaw_gateway_usage_cost`, `openclaw_doctor`
-- `openclaw_gateway_status`, `openclaw_sessions_list`, `openclaw_session_status`
-- `openclaw_channels_list`, `openclaw_channels_status`, `openclaw_channels_logs`
-- `openclaw_models_status`, `openclaw_models_list`, `openclaw_models_aliases_list`, `openclaw_models_fallbacks_list`
-- `openclaw_config_get`, `openclaw_config_file`, `openclaw_config_validate`, `openclaw_config_schema`
-- `openclaw_approvals_get`
-- `openclaw_devices_list`, `openclaw_nodes_list`, `openclaw_nodes_pending`, `openclaw_nodes_status`
-- `openclaw_skills_check`, `openclaw_system_presence`
-- `openclaw_skills_list`, `openclaw_skills_detail`
-- `openclaw_cron_status`, `openclaw_cron_list`, `openclaw_cron_add`, `openclaw_cron_update`, `openclaw_cron_remove`, `openclaw_cron_run`, `openclaw_cron_runs`
+| MCP Tool | What it does | CLI equivalent |
+|---|---|---|
+| `openclaw_health` | Gateway health snapshot | `openclaw health` |
+| `openclaw_status` | Status family summary (default/deep/usage/all) | `openclaw status` |
+| `openclaw_logs` | Bounded log tail with redaction | `openclaw logs` |
+| `openclaw_gateway_probe` | Gateway reachability and RPC diagnostics | `openclaw health --probe` |
+| `openclaw_gateway_usage_cost` | Usage cost summaries from session logs | `openclaw usage cost` |
+| `openclaw_doctor` | Read-only diagnostics (no repair) | `openclaw doctor` |
+| `openclaw_gateway_status` | Curated health fields from `GET /healthz` | `openclaw status` (HTTP only) |
+| `openclaw_channels_list` | Configured channel accounts | `openclaw channels list` |
+| `openclaw_channels_status` | Channel runtime status, optional live probes | `openclaw channels status` |
+| `openclaw_channels_logs` | Bounded channel log tail with redaction | `openclaw channels logs` |
+| `openclaw_models_status` | Model/provider auth status and live probes | `openclaw models status` |
+| `openclaw_models_list` | Available models for an agent workspace | `openclaw models list` |
+| `openclaw_models_aliases_list` | Model aliases from active config | `openclaw models aliases` |
+| `openclaw_models_fallbacks_list` | Model fallback chains from active config | `openclaw models fallbacks` |
+| `openclaw_config_get` | Read one config path (secret paths blocked) | `openclaw config get <path>` |
+| `openclaw_config_file` | Active config file path | `openclaw config file` |
+| `openclaw_config_validate` | Config validation summary | `openclaw config validate` |
+| `openclaw_config_schema` | Full config JSON schema | `openclaw config schema` |
+| `openclaw_approvals_get` | Effective exec approvals snapshot | `openclaw exec approvals get` |
+| `openclaw_devices_list` | Pending and paired devices (tokens redacted) | `openclaw device pair list` |
+| `openclaw_nodes_list` | Node list with optional filters | `openclaw node list` |
+| `openclaw_nodes_pending` | Nodes awaiting pairing approval | `openclaw node pair list` |
+| `openclaw_nodes_status` | Node status view with optional filters | `openclaw node status` |
+| `openclaw_skills_check` | Skill readiness summary | `openclaw skills status` |
+| `openclaw_system_presence` | Current system presence entries | `openclaw system presence` |
+| `openclaw_sessions_list` | Read-only session list with bounded paging | `openclaw sessions list` |
+| `openclaw_session_status` | Read-only status for one session | `openclaw session status` |
+| `openclaw_skills_list` | Curated skill inventory with filtering/paging | `openclaw skills list` |
+| `openclaw_skills_detail` | Detail for one skill by key or name | `openclaw skills detail` |
+| `openclaw_cron_status` | Cron scheduler status | `openclaw cron status` |
+| `openclaw_cron_list` | List cron jobs with paging/filter/sort | `openclaw cron list` |
+| `openclaw_cron_add` | Create a cron job (`at`, `every`, or `cron` schedule) | `openclaw cron add` |
+| `openclaw_cron_update` | Patch an existing cron job | `openclaw cron update` |
+| `openclaw_cron_remove` | Remove a cron job | `openclaw cron remove` |
+| `openclaw_cron_run` | Trigger a job on demand (may only enqueue) | `openclaw cron run` |
+| `openclaw_cron_runs` | Inspect actual run outcomes and history | `openclaw cron runs` |
 
 ## Tool Parameters
 
