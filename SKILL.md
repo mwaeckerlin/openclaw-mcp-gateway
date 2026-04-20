@@ -1,320 +1,166 @@
 ---
 name: openclaw-mcp-gateway
-description: Use this skill when operating or integrating the openclaw-mcp-gateway project: configuring MCP-to-Gateway auth, running health/tools checks, enabling cron RPC tools, and troubleshooting gateway transport/validation/auth errors for SSH-sandboxed agents.
+description: Use this skill when you need to inspect or control an OpenClaw Gateway via MCP tools — checking gateway health, reading status/logs/config, managing cron jobs, or diagnosing failures. All tools are read-only except the cron management set.
 ---
 
 # OpenClaw MCP Gateway
 
-Use this skill to operate the `openclaw-mcp-gateway` service safely and effectively.
+MCP gateway that exposes a strict allowlist of read-only and cron-management tools against an OpenClaw Gateway backend. Credentials stay outside SSH sandbox agents.
 
-## What this project does
+## First step
 
-- Exposes a strict MCP allowlist for OpenClaw Gateway operations.
-- Keeps gateway credentials outside SSH sandbox agents.
-- Supports safe read-only status/session/skill visibility plus allowlisted Gateway WebSocket RPC cron tools.
+**Always call `openclaw_gateway_status` first.** If it returns `ok: false` or throws, the gateway is unreachable — stop and report the error. Do not call other tools until connectivity is confirmed.
 
-## Setup Checklist
+## Tool selection guide
 
-1. Verify `OPENCLAW_MCP_GATEWAY_URL` is set in your environment (check `echo $OPENCLAW_MCP_GATEWAY_URL`). Default: `http://openclaw-mcp-gateway:4000`.
-2. Verify the MCP gateway is reachable: `curl -s $OPENCLAW_MCP_GATEWAY_URL/healthz` should return `{"ok":true,"status":"ready"}`.
+### Health and diagnostics
 
-## How to call MCP tools
+| Goal | Tool |
+|---|---|
+| Confirm gateway is reachable | `openclaw_gateway_status` |
+| Full health snapshot | `openclaw_health` (add `verbose: true` for probe detail) |
+| RPC layer reachability check | `openclaw_gateway_probe` |
+| Read-only diagnostics (no repair) | `openclaw_doctor` (add `deep: true` for channel probes) |
 
-Send HTTP POST requests to `$OPENCLAW_MCP_GATEWAY_URL` using the MCP JSON-RPC protocol:
+### Status and usage
 
-```bash
-curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-```
+| Goal | Tool |
+|---|---|
+| Summary status | `openclaw_status` |
+| Deep status including nodes | `openclaw_status` with `type: "deep"` |
+| Usage/cost summary | `openclaw_status` with `type: "usage"` or `openclaw_gateway_usage_cost` |
+| All status families at once | `openclaw_status` with `type: "all"` |
+| Current system presence | `openclaw_system_presence` |
 
-To invoke a tool:
+### Logs
 
-```bash
-curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"openclaw_gateway_status","arguments":{}}}'
-```
+| Goal | Tool |
+|---|---|
+| Recent gateway logs | `openclaw_logs` (bounded; `follow` is rejected) |
+| Logs scoped to one channel | `openclaw_channels_logs` with `channel` |
 
-## Available tools
+### Channels and models
 
-7. Verify MCP `tools/list` contains:
-   - `openclaw_status`
-   - `openclaw_gateway_status`
-   - `openclaw_sessions_list`
-   - `openclaw_session_status`
-   - `openclaw_skills_list`
-   - `openclaw_skills_detail`
-   - `openclaw_cron_status`
-   - `openclaw_cron_list`
-   - `openclaw_cron_add`
-   - `openclaw_cron_update`
-   - `openclaw_cron_remove`
-   - `openclaw_cron_run`
-   - `openclaw_cron_runs`
+| Goal | Tool |
+|---|---|
+| Which channels are configured | `openclaw_channels_list` |
+| Are channels reachable right now | `openclaw_channels_status` (add `probe: true`) |
+| Which models are available | `openclaw_models_list` |
+| Are model credentials valid | `openclaw_models_status` (add `probe: true` for live test) |
+| Model aliases from config | `openclaw_models_aliases_list` |
+| Model fallback chains from config | `openclaw_models_fallbacks_list` |
 
-## Tool Parameters
+### Config inspection
 
-### `openclaw_status`
+| Goal | Tool |
+|---|---|
+| Read a specific config value | `openclaw_config_get` with required `path` (secret paths blocked) |
+| Where is the active config file | `openclaw_config_file` |
+| Is the config valid | `openclaw_config_validate` |
+| Full config schema | `openclaw_config_schema` |
 
-No parameters. Returns a safe bounded session summary (legacy alias of `openclaw_sessions_list`).
+### Approvals, devices, and nodes
 
-### `openclaw_gateway_status`
+| Goal | Tool |
+|---|---|
+| Effective exec approvals | `openclaw_approvals_get` (`target`: `"local"` / `"gateway"` / `"node"`) |
+| Paired and pending devices | `openclaw_devices_list` |
+| Node list | `openclaw_nodes_list` (filter: `connectedOnly`, `lastConnected`) |
+| Nodes awaiting pairing | `openclaw_nodes_pending` |
+| Node status view | `openclaw_nodes_status` |
 
-No parameters. Checks gateway health (calls `GET /healthz`) and returns only curated safe fields.
+### Skills and sessions
 
-### `openclaw_sessions_list`
+| Goal | Tool |
+|---|---|
+| Are all skills ready | `openclaw_skills_check` |
+| Browse skills | `openclaw_skills_list` (filter: `eligible`, `query`, paginate with `limit`/`offset`) |
+| Detail for one skill | `openclaw_skills_detail` — requires one of `skillKey` or `name` |
+| List active sessions | `openclaw_sessions_list` (filter: `kind`, `activeMinutes`) |
+| Status of one session | `openclaw_session_status` — requires one of `sessionKey` or `sessionId` |
 
-All parameters optional:
+### Cron management
 
-| Parameter | Type | Description |
-|---|---|---|
-| `kind` | `"main"` \| `"group"` \| `"cron"` \| `"hook"` \| `"node"` | Filter by session kind |
-| `activeMinutes` | integer 1–10080 | Filter to recently active sessions |
-| `limit` | integer 1–100 | Max sessions to return |
-| `offset` | integer 0–1000 | Pagination offset |
+| Goal | Tool |
+|---|---|
+| Is the scheduler running | `openclaw_cron_status` |
+| List jobs | `openclaw_cron_list` |
+| Create a job | `openclaw_cron_add` — see [Cron job reference](#cron-job-reference) |
+| Modify a job | `openclaw_cron_update` — requires one of `id` or `jobId`, plus `patch` |
+| Delete a job | `openclaw_cron_remove` — requires one of `id` or `jobId` |
+| Trigger a job now | `openclaw_cron_run` — **always follow up with `openclaw_cron_runs`**; the tool may only enqueue |
+| Check run history or outcome | `openclaw_cron_runs` |
 
-### `openclaw_session_status`
+## Complete tool list
 
-Exactly one of `sessionKey` or `sessionId` is required.
+All exposed tools (use the selection guide above to pick the right one):
 
-### `openclaw_skills_list`
+`openclaw_gateway_status` · `openclaw_health` · `openclaw_status` · `openclaw_logs` · `openclaw_gateway_probe` · `openclaw_gateway_usage_cost` · `openclaw_doctor` · `openclaw_system_presence` · `openclaw_channels_list` · `openclaw_channels_status` · `openclaw_channels_logs` · `openclaw_models_status` · `openclaw_models_list` · `openclaw_models_aliases_list` · `openclaw_models_fallbacks_list` · `openclaw_config_get` · `openclaw_config_file` · `openclaw_config_validate` · `openclaw_config_schema` · `openclaw_approvals_get` · `openclaw_devices_list` · `openclaw_nodes_list` · `openclaw_nodes_pending` · `openclaw_nodes_status` · `openclaw_skills_check` · `openclaw_sessions_list` · `openclaw_session_status` · `openclaw_skills_list` · `openclaw_skills_detail` · `openclaw_cron_status` · `openclaw_cron_list` · `openclaw_cron_add` · `openclaw_cron_update` · `openclaw_cron_remove` · `openclaw_cron_run` · `openclaw_cron_runs`
 
-All parameters optional:
+## Cron job reference
 
-| Parameter | Type | Description |
-|---|---|---|
-| `agentId` | string | Optional agent workspace selector |
-| `limit` | integer 1–100 | Max skills to return |
-| `offset` | integer 0–1000 | Pagination offset |
-| `eligible` | boolean | Restrict to currently eligible skills |
-| `query` | string | Filter by skill name/key/description |
+Use this when building arguments for `openclaw_cron_add` or `openclaw_cron_update`.
 
-### `openclaw_skills_detail`
+### schedule (required on add)
 
-Exactly one of `skillKey` or `name` is required (optional `agentId` supported).
-
-### `openclaw_cron_status`
-
-No parameters. Returns cron scheduler status.
-
-### `openclaw_cron_list`
-
-All parameters optional:
-
-| Parameter | Type | Description |
-|---|---|---|
-| `limit` | integer 1–200 | Max jobs to return |
-| `offset` | integer ≥0 | Pagination offset |
-| `query` | string | Filter by name/description |
-| `enabled` | `"all"` \| `"enabled"` \| `"disabled"` | Filter by enabled state |
-| `includeDisabled` | boolean | Include disabled jobs |
-| `sortBy` | `"nextRunAtMs"` \| `"updatedAtMs"` \| `"name"` | Sort field |
-| `sortDir` | `"asc"` \| `"desc"` | Sort direction |
-
-### `openclaw_cron_add`
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `name` | string | yes | Job name |
-| `schedule` | object | yes | Schedule — see [Schedule](#schedule-object) |
-| `sessionTarget` | string | yes | `"main"` \| `"isolated"` \| `"current"` \| `"session:<id>"` |
-| `wakeMode` | string | yes | `"now"` \| `"next-heartbeat"` |
-| `payload` | object | yes | What to deliver — see [Payload](#payload-object) |
-| `description` | string | no | Human-readable description |
-| `enabled` | boolean | no | Start enabled (default: true) |
-| `deleteAfterRun` | boolean | no | Remove job after first successful run |
-| `agentId` | string \| null | no | Target agent override |
-| `sessionKey` | string \| null | no | Session key override |
-| `delivery` | object | no | How to notify — see [Delivery](#delivery-object) |
-| `failureAlert` | false \| object | no | Alert after repeated failures — see [FailureAlert](#failurealert-object) |
-
-### `openclaw_cron_update`
-
-Exactly one of `id` or `jobId` is required, plus `patch`:
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `id` | string | one-of | Internal job UUID |
-| `jobId` | string | one-of | Human-readable job name/id |
-| `patch` | object | yes | Fields to update (all optional) — same fields as `openclaw_cron_add`, plus `state` (see [State patch](#state-patch)) |
-
-### `openclaw_cron_remove`
-
-Exactly one of `id` or `jobId` is required:
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `id` | string | one-of | Internal job UUID |
-| `jobId` | string | one-of | Human-readable job name/id |
-
-### `openclaw_cron_run`
-
-Exactly one of `id` or `jobId` is required:
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `id` | string | one-of | Internal job UUID |
-| `jobId` | string | one-of | Human-readable job name/id |
-| `mode` | `"due"` \| `"force"` | no | `force` ignores schedule; `due` runs only if due |
-
-> **Note:** `openclaw_cron_run` may return `enqueued: true`. Use `openclaw_cron_runs` to inspect the final execution outcome.
-
-### `openclaw_cron_runs`
-
-All parameters optional:
-
-| Parameter | Type | Description |
-|---|---|---|
-| `scope` | `"job"` \| `"all"` | Scope to specific job or all jobs |
-| `id` | string | Filter by internal job UUID |
-| `jobId` | string | Filter by human-readable job name/id |
-| `limit` | integer 1–200 | Max runs to return |
-| `offset` | integer ≥0 | Pagination offset |
-| `statuses` | string[] (1–3 items) | Array of `"ok"`, `"error"`, `"skipped"` |
-| `status` | `"all"` \| `"ok"` \| `"error"` \| `"skipped"` | Single status filter |
-| `deliveryStatuses` | string[] (1–4 items) | Array of delivery status values |
-| `deliveryStatus` | `"delivered"` \| `"not-delivered"` \| `"unknown"` \| `"not-requested"` | Single delivery status filter |
-| `query` | string | Text filter |
-| `sortDir` | `"asc"` \| `"desc"` | Sort direction |
-
----
-
-## Schedule Object
-
-One of three kinds:
+Pick one `kind`:
 
 ```jsonc
-// Run once at a specific time (ISO 8601 with offset)
-{ "kind": "at", "at": "2026-06-01T10:00:00+00:00" }
-
-// Repeat every N milliseconds
-{ "kind": "every", "everyMs": 3600000, "anchorMs": 0 }
-
-// Cron expression
-{ "kind": "cron", "expr": "0 9 * * 1-5", "tz": "Europe/Berlin", "staggerMs": 0 }
+{ "kind": "at",    "at": "2026-06-01T10:00:00+00:00" }
+{ "kind": "every", "everyMs": 3600000 }
+{ "kind": "cron",  "expr": "0 9 * * 1-5", "tz": "Europe/Berlin" }
 ```
 
-| Field | Type | Required for | Description |
-|---|---|---|---|
-| `kind` | `"at"` \| `"every"` \| `"cron"` | all | Schedule type |
-| `at` | string (ISO 8601) | `at` | Run-once timestamp |
-| `everyMs` | integer ≥1 | `every` | Interval in milliseconds |
-| `anchorMs` | integer ≥0 | `every` | Epoch anchor offset |
-| `expr` | string | `cron` | Cron expression |
-| `tz` | string | `cron` | IANA timezone (default: UTC) |
-| `staggerMs` | integer ≥0 | `cron` | Random jitter up to N ms |
+`cron` also accepts `staggerMs` (random jitter); `every` accepts `anchorMs`.
 
-## Payload Object
+### payload (required on add)
 
-One of two kinds:
+Pick one `kind`:
 
 ```jsonc
-// System event
 { "kind": "systemEvent", "text": "run nightly check" }
-
-// Agent turn (trigger an AI agent)
-{
-  "kind": "agentTurn",
-  "message": "perform nightly analysis",
-  "model": "gpt-4o",
-  "fallbacks": ["gpt-4"],
-  "toolsAllow": ["search", "code_interpreter"],
-  "lightContext": false,
-  "allowUnsafeExternalContent": false,
-  "timeoutSeconds": 300
-}
+{ "kind": "agentTurn",   "message": "perform nightly analysis", "model": "gpt-4o",
+  "fallbacks": ["gpt-4"], "timeoutSeconds": 300 }
 ```
 
-| Field | Type | Required for | Description |
-|---|---|---|---|
-| `kind` | `"systemEvent"` \| `"agentTurn"` | all | Payload type |
-| `text` | string | `systemEvent` | Event text |
-| `message` | string | `agentTurn` | Prompt for the agent |
-| `model` | string | — | Model override |
-| `fallbacks` | string[] | — | Fallback models |
-| `thinking` | string | — | Thinking mode hint |
-| `timeoutSeconds` | number ≥0 | — | Agent timeout |
-| `allowUnsafeExternalContent` | boolean | — | Allow external content |
-| `lightContext` | boolean | — | Use minimal context |
-| `toolsAllow` | string[] | — | Allowed tools list |
+`agentTurn` optional fields: `thinking`, `lightContext`, `toolsAllow`, `allowUnsafeExternalContent`.
 
-## Delivery Object
+### delivery (optional)
 
 ```jsonc
-// No delivery notification
 { "mode": "none" }
-
-// Announce result to a channel
 { "mode": "announce", "channel": "last" }
-
-// POST result to a webhook URL
-{ "mode": "webhook", "to": "https://hooks.example.com/notify" }
+{ "mode": "webhook",  "to": "https://hooks.example.com/notify" }
 ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `mode` | `"none"` \| `"announce"` \| `"webhook"` | yes (on add) | Delivery mode |
-| `to` | string | yes for `webhook` | Webhook URL |
-| `channel` | `"last"` \| string | — | Channel name (`"last"` = most recent) |
-| `accountId` | string | — | Account ID override |
-| `bestEffort` | boolean | — | Do not fail job on delivery error |
-| `failureDestination` | object | — | Alternative destination on job failure: `{ channel?, to?, accountId?, mode? }` |
+Add `bestEffort: true` to avoid failing the job on delivery error. Use `failureDestination` for an alternate target on job failure.
 
-## FailureAlert Object
+### failureAlert (optional)
 
 ```jsonc
-// Disable failure alerts
 false
-
-// Alert after N consecutive failures
 { "after": 3, "channel": "last", "cooldownMs": 3600000 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `after` | integer ≥1 | Consecutive failures before alert |
-| `channel` | `"last"` \| string | Alert channel |
-| `to` | string | Alert destination |
-| `cooldownMs` | integer ≥0 | Minimum ms between repeated alerts |
-| `mode` | `"announce"` \| `"webhook"` | Alert delivery mode |
-| `accountId` | string | Account ID for alert |
+### state patch (openclaw_cron_update only)
 
-## State Patch
-
-Available only in `openclaw_cron_update.patch.state`. Used to manually correct job runtime state:
-
-| Field | Type | Description |
-|---|---|---|
-| `nextRunAtMs` | integer ≥0 | Override next run epoch ms |
-| `runningAtMs` | integer ≥0 | Mark as currently running since epoch ms |
-| `lastRunAtMs` | integer ≥0 | Override last run epoch ms |
-| `lastRunStatus` | `"ok"` \| `"error"` \| `"skipped"` | Override last run status |
-| `lastStatus` | `"ok"` \| `"error"` \| `"skipped"` | Override overall status |
-| `lastError` | string | Last error message |
-| `lastErrorReason` | `"auth"` \| `"format"` \| `"rate_limit"` \| `"billing"` \| `"timeout"` \| `"model_not_found"` \| `"unknown"` | Error reason code |
-| `lastDurationMs` | integer ≥0 | Last run duration in ms |
-| `consecutiveErrors` | integer ≥0 | Override consecutive error count |
-| `lastDelivered` | boolean | Override last delivery success flag |
-| `lastDeliveryStatus` | `"delivered"` \| `"not-delivered"` \| `"unknown"` \| `"not-requested"` | Override delivery status |
-| `lastDeliveryError` | string | Last delivery error message |
-| `lastFailureAlertAtMs` | integer ≥0 | Last failure alert epoch ms |
+Pass `patch.state` to manually correct runtime state fields: `nextRunAtMs`, `lastRunAtMs`, `lastRunStatus`, `consecutiveErrors`, `lastDeliveryStatus`, etc.
 
 ---
 
-## Troubleshooting Map
+## Troubleshooting
 
-| Error message contains | Cause | Fix |
+| Error contains | Cause | Action |
 |---|---|---|
-| `Validation mismatch` | Input schema rejected locally | Fix argument shape |
+| `Validation mismatch` | Input schema rejected before RPC | Fix argument shape |
 | `Gateway auth failure` | Token invalid or missing | Check `OPENCLAW_GATEWAY_TOKEN` |
-| `Gateway transport timeout` | Gateway unreachable or stalled | Check `OPENCLAW_GATEWAY_URL` connectivity |
-| `Gateway protocol failure` | Malformed or non-ok RPC frame, or device not paired | Check Gateway version; verify `OPENCLAW_DEVICE_PAIRING` contains the correct public key |
-| `not supported by the current Gateway` | Gateway lacks required cron method | Upgrade Gateway |
+| `Gateway transport timeout` | Gateway unreachable or stalled | Check `OPENCLAW_GATEWAY_URL` |
+| `Gateway protocol failure` | Bad RPC frame or device not paired | Check Gateway version; verify device pairing |
+| `not supported by the current Gateway` | Gateway lacks the required RPC method | Upgrade Gateway |
 
-## Safe Operating Rules
+## Safe operating rules
 
-- Use only the MCP tools listed above; do not attempt to bypass with raw HTTP calls to the OpenClaw gateway.
-- Session/skill/status tools are read-only.
-- `openclaw_cron_run` may return `enqueued: true` — always follow up with `openclaw_cron_runs` to check the actual outcome.
-- Keep per-tool usage scoped to the required operation only.
+- All non-cron tools are read-only.
+- `openclaw_config_get` blocks secret-bearing paths; do not attempt to work around this.
+- `openclaw_cron_run` may return `enqueued: true` — always follow up with `openclaw_cron_runs` to confirm the outcome.
+- Do not bypass these tools with raw HTTP calls to the OpenClaw gateway.

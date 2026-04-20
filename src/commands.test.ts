@@ -39,11 +39,11 @@ function withEnv(env: Partial<Record<(typeof ENV_KEYS)[number], string>>, run: (
   }
 }
 
-test("openclaw_status uses fixed verified /tools/invoke payload mapping", () => {
-  assert.deepEqual(ALLOWED_HTTP_GATEWAY_OPERATIONS.openclaw_status, {
+test("openclaw_sessions_list uses fixed verified /tools/invoke payload mapping", () => {
+  assert.deepEqual(ALLOWED_HTTP_GATEWAY_OPERATIONS.openclaw_sessions_list, {
     requestKind: "invoke",
     timeoutMs: 12_000,
-    description: "Return a safe, bounded summary of OpenClaw sessions (legacy alias of openclaw_sessions_list).",
+    description: "List visible OpenClaw sessions with strict local filtering and bounded paging.",
     tool: "sessions_list",
     action: "json"
   });

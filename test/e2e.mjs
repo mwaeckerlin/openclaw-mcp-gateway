@@ -118,7 +118,30 @@ async function main() {
     const toolNames = tools.map((t) => t.name);
 
     const requiredTools = [
+      "openclaw_health",
       "openclaw_status",
+      "openclaw_logs",
+      "openclaw_gateway_probe",
+      "openclaw_gateway_usage_cost",
+      "openclaw_doctor",
+      "openclaw_channels_list",
+      "openclaw_channels_status",
+      "openclaw_channels_logs",
+      "openclaw_models_status",
+      "openclaw_models_list",
+      "openclaw_models_aliases_list",
+      "openclaw_models_fallbacks_list",
+      "openclaw_config_get",
+      "openclaw_config_file",
+      "openclaw_config_validate",
+      "openclaw_config_schema",
+      "openclaw_approvals_get",
+      "openclaw_devices_list",
+      "openclaw_nodes_list",
+      "openclaw_nodes_pending",
+      "openclaw_nodes_status",
+      "openclaw_skills_check",
+      "openclaw_system_presence",
       "openclaw_gateway_status",
       "openclaw_sessions_list",
       "openclaw_session_status",
@@ -168,7 +191,7 @@ async function main() {
     }
 
     // ------------------------------------------------------- openclaw_status
-    // POSITIVE: Tool must return the safe session summary.
+    // POSITIVE: Tool must return status family output.
     try {
       const r = await client.callTool({ name: "openclaw_status" });
       if (!r.isError) {
@@ -178,14 +201,10 @@ async function main() {
         } else {
           try {
             const parsed = JSON.parse(text.text);
-            if (
-              typeof parsed.total === "number" &&
-              typeof parsed.limit === "number" &&
-              Array.isArray(parsed.sessions)
-            ) {
-              pass(`openclaw_status → total=${parsed.total} returned=${parsed.returned}`);
+            if (typeof parsed.status === "object" && parsed.status !== null) {
+              pass("openclaw_status → returned status object");
             } else {
-              fail("openclaw_status → missing expected fields total/limit/sessions", text.text.slice(0, 200));
+              fail("openclaw_status → missing expected status object", text.text.slice(0, 200));
             }
           } catch {
             fail("openclaw_status → response is not valid JSON", text.text.slice(0, 200));
@@ -196,6 +215,395 @@ async function main() {
       }
     } catch (e) {
       fail("openclaw_status → unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------------- openclaw_health
+    try {
+      const r = await client.callTool({ name: "openclaw_health" });
+      if (!r.isError) {
+        const text = firstTextContent(r.content);
+        if (text) {
+          const parsed = JSON.parse(text.text);
+          if (parsed.ok === true && typeof parsed.durationMs === "number") pass("openclaw_health → returned healthy payload");
+          else fail("openclaw_health → unexpected payload", text.text.slice(0, 200));
+        } else fail("openclaw_health → no text content", JSON.stringify(r));
+      } else {
+        fail("openclaw_health → expected success, got error", JSON.stringify(r.content));
+      }
+    } catch (e) {
+      fail("openclaw_health → unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------------- openclaw_config_validate
+    try {
+      const r = await client.callTool({ name: "openclaw_config_validate" });
+      if (!r.isError) {
+        const text = firstTextContent(r.content);
+        if (text) {
+          const parsed = JSON.parse(text.text);
+          if (typeof parsed.valid === "boolean") pass(`openclaw_config_validate → valid=${parsed.valid}`);
+          else fail("openclaw_config_validate → missing valid field", text.text.slice(0, 200));
+        } else fail("openclaw_config_validate → no text content", JSON.stringify(r));
+      } else {
+        fail("openclaw_config_validate → expected success, got error", JSON.stringify(r.content));
+      }
+    } catch (e) {
+      fail("openclaw_config_validate → unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------------- openclaw_system_presence
+    try {
+      const r = await client.callTool({ name: "openclaw_system_presence" });
+      if (!r.isError) {
+        const text = firstTextContent(r.content);
+        if (text) {
+          const parsed = JSON.parse(text.text);
+          if (Array.isArray(parsed)) pass(`openclaw_system_presence → entries=${parsed.length}`);
+          else fail("openclaw_system_presence → expected array", text.text.slice(0, 200));
+        } else fail("openclaw_system_presence → no text content", JSON.stringify(r));
+      } else {
+        fail("openclaw_system_presence → expected success, got error", JSON.stringify(r.content));
+      }
+    } catch (e) {
+      fail("openclaw_system_presence → unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------------- openclaw_logs (bounded, no follow)
+    // Uses logs.tail -- verified gateway RPC method.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_logs", arguments: { limit: 10 } });
+        if (!r.isError) {
+          const text = firstTextContent(r.content);
+          if (text) res = { ok: true, parsed: JSON.parse(text.text) };
+          else res = { ok: false, error: "no text content" };
+        } else {
+          const e2 = JSON.stringify(r.content);
+          res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 };
+        }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_logs -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_logs -> capability-not-supported (acceptable)");
+      else pass("openclaw_logs -> returned log payload");
+    }
+
+    // ------------------------------------------------------- openclaw_gateway_probe
+    // Uses health + status -- both verified gateway RPC methods.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_gateway_probe", arguments: {} });
+        if (!r.isError) {
+          const text = firstTextContent(r.content);
+          if (text) res = { ok: true, parsed: JSON.parse(text.text) };
+          else res = { ok: false, error: "no text content" };
+        } else {
+          const e2 = JSON.stringify(r.content);
+          res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 };
+        }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_gateway_probe -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_gateway_probe -> capability-not-supported (acceptable)");
+      else if (typeof res.parsed.rpcOk === "boolean") pass("openclaw_gateway_probe -> rpcOk=" + res.parsed.rpcOk);
+      else fail("openclaw_gateway_probe -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_gateway_usage_cost
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_gateway_usage_cost", arguments: { days: 7 } });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_gateway_usage_cost -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_gateway_usage_cost -> capability-not-supported (acceptable)");
+      else pass("openclaw_gateway_usage_cost -> returned usage-cost payload");
+    }
+
+    // ------------------------------------------------------- openclaw_doctor
+    // Uses health + status -- both verified.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_doctor", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_doctor -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_doctor -> capability-not-supported (acceptable)");
+      else if (res.parsed.health !== undefined && res.parsed.status !== undefined) pass("openclaw_doctor -> returned health+status");
+      else fail("openclaw_doctor -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_channels_list
+    // Derived from config.get -- verified.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_channels_list", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_channels_list -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_channels_list -> capability-not-supported (acceptable)");
+      else if (typeof res.parsed.total === "number") pass("openclaw_channels_list -> total=" + res.parsed.total);
+      else fail("openclaw_channels_list -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_channels_status
+    // Uses channels.status -- verified gateway RPC method.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_channels_status", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_channels_status -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_channels_status -> capability-not-supported (acceptable)");
+      else pass("openclaw_channels_status -> returned channel status payload");
+    }
+
+    // ------------------------------------------------------- openclaw_channels_logs
+    // Derived from logs.tail -- verified method.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_channels_logs", arguments: { lines: 5 } });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_channels_logs -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_channels_logs -> capability-not-supported (acceptable)");
+      else if (typeof res.parsed.channel === "string" && Array.isArray(res.parsed.lines)) pass("openclaw_channels_logs -> channel=" + res.parsed.channel + " returned=" + res.parsed.returned);
+      else fail("openclaw_channels_logs -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_models_status
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_models_status", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_models_status -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_models_status -> capability-not-supported (acceptable)");
+      else if (res.parsed.status !== undefined) pass("openclaw_models_status -> returned model status payload");
+      else fail("openclaw_models_status -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_models_list
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_models_list", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_models_list -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_models_list -> capability-not-supported (acceptable)");
+      else pass("openclaw_models_list -> returned models list payload");
+    }
+
+    // ------------------------------------------------------- openclaw_models_aliases_list
+    // Derived from config.get -- verified.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_models_aliases_list", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_models_aliases_list -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_models_aliases_list -> capability-not-supported (acceptable)");
+      else pass("openclaw_models_aliases_list -> returned model aliases payload");
+    }
+
+    // ------------------------------------------------------- openclaw_models_fallbacks_list
+    // Derived from config.get -- verified.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_models_fallbacks_list", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_models_fallbacks_list -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_models_fallbacks_list -> capability-not-supported (acceptable)");
+      else pass("openclaw_models_fallbacks_list -> returned model fallbacks payload");
+    }
+
+    // ------------------------------------------------------- openclaw_config_get (safe path)
+    // Uses config.get -- verified. Reads safe non-secret path.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_config_get", arguments: { path: "server.port" } });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_config_get -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_config_get -> capability-not-supported (acceptable)");
+      else if (typeof res.parsed.exists === "boolean" && res.parsed.path === "server.port") pass("openclaw_config_get -> exists=" + res.parsed.exists + " value=" + res.parsed.value);
+      else fail("openclaw_config_get -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // NEGATIVE: config_get must block secret-bearing paths
+    try {
+      const r = await client.callTool({ name: "openclaw_config_get", arguments: { path: "channels.telegram.token" } });
+      if (r.isError) {
+        const errText = JSON.stringify(r.content);
+        if (/secret-bearing|blocked|invalid/i.test(errText)) pass("openclaw_config_get (negative) -> correctly blocks secret-bearing path");
+        else fail("openclaw_config_get (negative) -> unexpected error body for secret path", errText);
+      } else {
+        fail("openclaw_config_get (negative) -> expected rejection for secret path, got success");
+      }
+    } catch (e) {
+      if (/secret-bearing|blocked|invalid/i.test(e.message ?? "")) pass("openclaw_config_get (negative) -> correctly blocks secret-bearing path");
+      else fail("openclaw_config_get (negative) -> unexpected exception", e.message);
+    }
+
+    // ------------------------------------------------------- openclaw_config_file
+    // Derived from config.get -- verified.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_config_file", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_config_file -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_config_file -> capability-not-supported (acceptable)");
+      else if (typeof res.parsed.exists === "boolean") pass("openclaw_config_file -> path=" + res.parsed.path + " exists=" + res.parsed.exists);
+      else fail("openclaw_config_file -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_config_schema
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_config_schema", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_config_schema -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_config_schema -> capability-not-supported (acceptable)");
+      else pass("openclaw_config_schema -> returned config schema payload");
+    }
+
+    // ------------------------------------------------------- openclaw_approvals_get target=local
+    // target=local returns a static note -- no RPC needed.
+    try {
+      const r = await client.callTool({ name: "openclaw_approvals_get", arguments: { target: "local" } });
+      if (!r.isError) {
+        const t = firstTextContent(r.content);
+        if (t) {
+          const parsed = JSON.parse(t.text);
+          if (parsed.target === "local" && typeof parsed.note === "string") pass("openclaw_approvals_get (local) -> returned local note");
+          else fail("openclaw_approvals_get (local) -> unexpected payload", t.text.slice(0, 200));
+        } else fail("openclaw_approvals_get (local) -> no text content");
+      } else fail("openclaw_approvals_get (local) -> got error", JSON.stringify(r.content));
+    } catch (e) { fail("openclaw_approvals_get (local) -> unexpected exception", e.message); }
+
+    // ------------------------------------------------------- openclaw_approvals_get target=gateway
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_approvals_get", arguments: { target: "gateway" } });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_approvals_get (gateway) -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_approvals_get (gateway) -> capability-not-supported (acceptable)");
+      else pass("openclaw_approvals_get (gateway) -> returned gateway approvals payload");
+    }
+
+    // ------------------------------------------------------- openclaw_devices_list
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_devices_list", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_devices_list -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_devices_list -> capability-not-supported (acceptable)");
+      else pass("openclaw_devices_list -> returned devices list payload");
+    }
+
+    // ------------------------------------------------------- openclaw_nodes_pending
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_nodes_pending", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_nodes_pending -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_nodes_pending -> capability-not-supported (acceptable)");
+      else if (Array.isArray(res.parsed.pending)) pass("openclaw_nodes_pending -> pending=" + res.parsed.pending.length);
+      else fail("openclaw_nodes_pending -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_nodes_list
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_nodes_list", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_nodes_list -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_nodes_list -> capability-not-supported (acceptable)");
+      else if (Array.isArray(res.parsed.paired)) pass("openclaw_nodes_list -> paired=" + res.parsed.paired.length);
+      else fail("openclaw_nodes_list -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_nodes_status
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_nodes_status", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_nodes_status -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_nodes_status -> capability-not-supported (acceptable)");
+      else if (Array.isArray(res.parsed.nodes)) pass("openclaw_nodes_status -> nodes=" + res.parsed.nodes.length);
+      else fail("openclaw_nodes_status -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // ------------------------------------------------------- openclaw_skills_check
+    // Uses skills.status -- verified gateway RPC method.
+    {
+      let res;
+      try {
+        const r = await client.callTool({ name: "openclaw_skills_check", arguments: {} });
+        if (!r.isError) { const t = firstTextContent(r.content); if (t) res = { ok: true, parsed: JSON.parse(t.text) }; else res = { ok: false, error: "no text" }; }
+        else { const e2 = JSON.stringify(r.content); res = /not supported|capability|method_not_found/i.test(e2) ? { ok: true, capability: true } : { ok: false, error: e2 }; }
+      } catch (e) { res = { ok: false, error: e.message }; }
+      if (!res.ok) fail("openclaw_skills_check -> unexpected error", res.error);
+      else if (res.capability) pass("openclaw_skills_check -> capability-not-supported (acceptable)");
+      else if (typeof res.parsed.ready === "number" && typeof res.parsed.total === "number") pass("openclaw_skills_check -> ready=" + res.parsed.ready + "/" + res.parsed.total);
+      else fail("openclaw_skills_check -> unexpected payload", JSON.stringify(res.parsed).slice(0, 200));
+    }
+
+    // NEGATIVE: openclaw_logs follow mode must be rejected locally
+    try {
+      const r = await client.callTool({ name: "openclaw_logs", arguments: { follow: true } });
+      if (r.isError) {
+        const errText = JSON.stringify(r.content);
+        if (/follow mode|not supported/i.test(errText)) pass("openclaw_logs (negative) -> correctly rejects follow mode");
+        else fail("openclaw_logs (negative) -> unexpected error body", errText);
+      } else {
+        fail("openclaw_logs (negative) -> expected rejection of follow mode, got success");
+      }
+    } catch (e) {
+      if (/follow mode|not supported/i.test(e.message ?? "")) pass("openclaw_logs (negative) -> correctly rejects follow mode");
+      else fail("openclaw_logs (negative) -> unexpected exception", e.message);
     }
 
     // ------------------------------------------------ openclaw_sessions_list

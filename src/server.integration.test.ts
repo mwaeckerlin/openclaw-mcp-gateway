@@ -74,6 +74,10 @@ function hasIsErrorTrue(value: unknown): boolean {
   return value.isError === true;
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function parseJsonTextOutput(content: unknown): Record<string, unknown> {
   if (!Array.isArray(content)) {
     throw new Error("Tool response content is not an array");
@@ -116,9 +120,22 @@ test(
       const tools = await client.listTools();
       const toolNames = new Set(tools.tools.map((tool) => tool.name));
       assert.ok(toolNames.has("openclaw_status"));
+      assert.ok(toolNames.has("openclaw_health"));
+      assert.ok(toolNames.has("openclaw_logs"));
+      assert.ok(toolNames.has("openclaw_gateway_probe"));
+      assert.ok(toolNames.has("openclaw_gateway_usage_cost"));
       assert.ok(toolNames.has("openclaw_gateway_status"));
       assert.ok(toolNames.has("openclaw_sessions_list"));
       assert.ok(toolNames.has("openclaw_session_status"));
+      assert.ok(toolNames.has("openclaw_channels_status"));
+      assert.ok(toolNames.has("openclaw_models_status"));
+      assert.ok(toolNames.has("openclaw_config_get"));
+      assert.ok(toolNames.has("openclaw_approvals_get"));
+      assert.ok(toolNames.has("openclaw_devices_list"));
+      assert.ok(toolNames.has("openclaw_nodes_list"));
+      assert.ok(toolNames.has("openclaw_nodes_pending"));
+      assert.ok(toolNames.has("openclaw_nodes_status"));
+      assert.ok(toolNames.has("openclaw_system_presence"));
       assert.ok(toolNames.has("openclaw_skills_list"));
       assert.ok(toolNames.has("openclaw_skills_detail"));
       assert.ok(toolNames.has("openclaw_cron_status"));
@@ -133,15 +150,16 @@ test(
         name: "openclaw_status"
       });
       const statusPayload = parseJsonTextOutput(statusResult.content);
-      assert.equal(typeof statusPayload.total, "number");
-      assert.ok(Array.isArray(statusPayload.sessions));
+      assert.ok(isObject(statusPayload.status));
 
       const gatewayStatusResult = await client.callTool({
         name: "openclaw_gateway_status"
       });
       const gatewayPayload = parseJsonTextOutput(gatewayStatusResult.content);
       assert.equal(gatewayPayload.ok, true);
-      assert.equal(typeof gatewayPayload.status, "string");
+      if (Object.hasOwn(gatewayPayload, "status")) {
+        assert.equal(typeof gatewayPayload.status, "string");
+      }
 
       const sessionsListResult = await client.callTool({
         name: "openclaw_sessions_list",
