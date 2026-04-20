@@ -10,7 +10,7 @@ AI agents running inside SSH-isolated and Docker-sandboxed environments cannot �
 
 Allows the SSH-sandboxed AI agent to:
  - **`openclaw_gateway_status`:** curated health from `GET /healthz`.
- - **Read-only normalized OpenClaw RPC tools**: health/status/logs/probe/usage-cost/doctor, channels/models/plugins/config/security/secrets/approvals/nodes/devices/sandbox/skills/system presence.
+ - **Read-only normalized OpenClaw RPC tools**: health/status/logs/probe/usage-cost/doctor, channels (list/status/logs), models, config, approvals, nodes, devices, skills, system presence.
  - **`openclaw_sessions_list` / `openclaw_session_status`:** read-only session visibility with explicit validation and bounded output.
  - **`openclaw_skills_list` / `openclaw_skills_detail`:** read-only skill visibility with curated metadata only.
  - **`openclaw_cron_status` / `openclaw_cron_list`:** inspect the cron scheduler and its jobs.
@@ -208,6 +208,25 @@ openclaw skills detail openclaw-mcp-gateway
 | `openclaw_cron_remove` | WebSocket RPC | `cron.remove` | Removes jobs via `id` or `jobId` |
 | `openclaw_cron_run` | WebSocket RPC | `cron.run` | Triggers a job (may only enqueue) |
 | `openclaw_cron_runs` | WebSocket RPC | `cron.runs` | Inspects actual run outcomes/history |
+
+## Not Implemented — Awaiting Gateway RPC Support
+
+The following tools were designed for this gateway but are **not exposed as MCP tools** because the OpenClaw Gateway does not currently expose the required functionality as a Gateway RPC method. They are available as local CLI commands only and therefore cannot be forwarded over the authenticated WebSocket RPC layer used by this gateway.
+
+| Intended MCP Tool | Would-be Gateway RPC | Functionality |
+|---|---|---|
+| `openclaw_channels_capabilities` | `channels.capabilities` | Channel capability hints and permissions |
+| `openclaw_channels_resolve` | `channels.resolve` | Resolve `#channel` names or `@user` mentions to canonical IDs |
+| `openclaw_plugins_list` | `plugins.list` | Plugin inventory with enable/disable state |
+| `openclaw_plugins_inspect` | `plugins.inspect` | Configuration and state of a single plugin |
+| `openclaw_plugins_doctor` | `plugins.doctor` | Read-only plugin health diagnostics |
+| `openclaw_security_audit` | `security.audit` | Read-only security audit of gateway configuration (no repair) |
+| `openclaw_secrets_audit` | `secrets.audit` | Read-only audit of configured secret references (values redacted) |
+| `openclaw_sandbox_explain` | `sandbox.explain` | Effective sandbox policy for a session or agent |
+| `openclaw_sandbox_list` | `sandbox.list` | Available sandbox runtimes and their capabilities |
+| `openclaw_config_schema_lookup` | `config.schema.lookup` | Schema metadata for a specific config path (Gateway RPC exists but correct request shape needs verification) |
+
+When the Gateway adds RPC support for these methods, or when the request shape for `config.schema.lookup` is confirmed, the corresponding MCP tools can be re-added here.
 
 ## Tool Parameter Reference
 
@@ -538,3 +557,37 @@ npm run build         # compiles TypeScript to dist/
 npm run build:docker  # builds the Docker image
 npm test              # runs unit tests, then E2E tests inside Docker Compose
 ```
+
+## TODO — Missing Gateway RPC Calls
+
+The items below are blocked on the OpenClaw Gateway exposing the listed method over its authenticated WebSocket RPC interface. Each entry tracks one planned MCP tool. Implement when the Gateway adds support.
+
+- [ ] **`openclaw_channels_capabilities`** — needs Gateway RPC `channels.capabilities`  
+  Return capability hints and permissions for a channel account (e.g. which message types, file attachments, or reactions are supported). Parameters: `channel?`, `account?`, `target?`.
+
+- [ ] **`openclaw_channels_resolve`** — needs Gateway RPC `channels.resolve`  
+  Resolve a list of `#channel` names or `@user` mentions to their canonical IDs. Parameters: `entries: string[1..50]`, `channel?`, `account?`, `kind?: "auto" | "user" | "group"`.
+
+- [ ] **`openclaw_plugins_list`** — needs Gateway RPC `plugins.list`  
+  Return the installed plugin inventory with enable/disable state and version info. Parameters: `enabledOnly?`, `verbose?`.
+
+- [ ] **`openclaw_plugins_inspect`** — needs Gateway RPC `plugins.inspect`  
+  Inspect the configuration and runtime state of a single plugin by ID. Parameters: `id: string`.
+
+- [ ] **`openclaw_plugins_doctor`** — needs Gateway RPC `plugins.doctor`  
+  Read-only health diagnostics for all installed plugins; reports issues without applying any fix.
+
+- [ ] **`openclaw_security_audit`** — needs Gateway RPC `security.audit`  
+  Read-only audit of the gateway's security configuration (permissions, TLS, auth settings). Never applies repairs. Parameters: `deep?`.
+
+- [ ] **`openclaw_secrets_audit`** — needs Gateway RPC `secrets.audit`  
+  Read-only audit of configured secret references; all secret values are fully redacted in the response. Parameters: `check?`, `allowExec?`.
+
+- [ ] **`openclaw_sandbox_explain`** — needs Gateway RPC `sandbox.explain`  
+  Explain the effective sandbox policy (allowed syscalls, network rules, filesystem mounts) for a given session or agent. Parameters: `sessionKey?`, `agentId?`.
+
+- [ ] **`openclaw_sandbox_list`** — needs Gateway RPC `sandbox.list`  
+  List available sandbox runtimes and their capabilities. Parameters: `browserOnly?`.
+
+- [ ] **`openclaw_config_schema_lookup`** — needs correct request shape for existing Gateway RPC `config.schema.lookup`  
+  Look up schema metadata (type, description, allowed values) for a specific config path. The Gateway RPC method exists and is confirmed supported; the implementation was removed when the request shape (parameter name / path format) could not be verified against a live gateway response. Restore once the correct shape is confirmed. Parameters: `path: string`.
