@@ -241,7 +241,7 @@ When the Gateway adds RPC support for these methods, or when the request shape f
 
 ## Tool Parameter Reference
 
-### New normalized read-only RPC tools
+### Normalized read-only RPC tools
 
 All tools reject unknown arguments and apply strict bounds/redaction.
 

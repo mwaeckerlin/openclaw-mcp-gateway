@@ -56,7 +56,7 @@ curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
 
 `{ type?: "default" | "deep" | "usage" | "all" }` — runs real status family (no legacy sessions alias).
 
-### New normalized read-only RPC tool parameters
+### Normalized read-only RPC tool parameters
 
 - `openclaw_health { verbose?: boolean, timeoutMs?: integer[1000..120000] }`
 - `openclaw_logs { limit?: integer[1..5000], maxBytes?: integer[1..1000000], follow?: boolean, intervalMs?: integer[100..60000], format?: "default" | "json" | "plain", localTime?: boolean }` (`follow=true` rejected in MCP)
