@@ -11,7 +11,7 @@ Use this skill to operate the `openclaw-mcp-gateway` service safely and effectiv
 
 - Exposes a strict MCP allowlist for OpenClaw Gateway operations.
 - Keeps gateway credentials outside SSH sandbox agents.
-- Supports safe read-only status/session/skill visibility plus allowlisted Gateway WebSocket RPC cron tools.
+- Supports read-only Gateway RPC tools (health, status, logs, probe, channels, models, config, approvals, nodes, devices, skills, presence) and cron management tools.
 
 ## Setup Checklist
 
@@ -38,17 +38,18 @@ curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
 
 ## Available tools
 
-7. Verify MCP `tools/list` contains:
-   - normalized read-only RPC tools:
-     - `openclaw_health`, `openclaw_status`, `openclaw_logs`, `openclaw_gateway_probe`, `openclaw_gateway_usage_cost`, `openclaw_doctor`
-     - `openclaw_channels_list`, `openclaw_channels_status`, `openclaw_channels_logs`
-     - `openclaw_models_status`, `openclaw_models_list`, `openclaw_models_aliases_list`, `openclaw_models_fallbacks_list`
-     - `openclaw_config_get`, `openclaw_config_file`, `openclaw_config_validate`, `openclaw_config_schema`
-     - `openclaw_approvals_get`
-     - `openclaw_devices_list`, `openclaw_nodes_list`, `openclaw_nodes_pending`, `openclaw_nodes_status`
-     - `openclaw_skills_check`, `openclaw_system_presence`
-   - existing HTTP/session tools: `openclaw_gateway_status`, `openclaw_sessions_list`, `openclaw_session_status`
-   - existing skills + cron tools: `openclaw_skills_list`, `openclaw_skills_detail`, `openclaw_cron_status`, `openclaw_cron_list`, `openclaw_cron_add`, `openclaw_cron_update`, `openclaw_cron_remove`, `openclaw_cron_run`, `openclaw_cron_runs`
+Verify MCP `tools/list` contains all of the following tools:
+
+- `openclaw_health`, `openclaw_status`, `openclaw_logs`, `openclaw_gateway_probe`, `openclaw_gateway_usage_cost`, `openclaw_doctor`
+- `openclaw_gateway_status`, `openclaw_sessions_list`, `openclaw_session_status`
+- `openclaw_channels_list`, `openclaw_channels_status`, `openclaw_channels_logs`
+- `openclaw_models_status`, `openclaw_models_list`, `openclaw_models_aliases_list`, `openclaw_models_fallbacks_list`
+- `openclaw_config_get`, `openclaw_config_file`, `openclaw_config_validate`, `openclaw_config_schema`
+- `openclaw_approvals_get`
+- `openclaw_devices_list`, `openclaw_nodes_list`, `openclaw_nodes_pending`, `openclaw_nodes_status`
+- `openclaw_skills_check`, `openclaw_system_presence`
+- `openclaw_skills_list`, `openclaw_skills_detail`
+- `openclaw_cron_status`, `openclaw_cron_list`, `openclaw_cron_add`, `openclaw_cron_update`, `openclaw_cron_remove`, `openclaw_cron_run`, `openclaw_cron_runs`
 
 ## Tool Parameters
 
@@ -56,35 +57,173 @@ curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
 
 `{ type?: "default" | "deep" | "usage" | "all" }` — runs real status family (no legacy sessions alias).
 
-### Normalized read-only RPC tool parameters
+### `openclaw_health`
 
-- `openclaw_health { verbose?: boolean, timeoutMs?: integer[1000..120000] }`
-- `openclaw_logs { limit?: integer[1..5000], maxBytes?: integer[1..1000000], follow?: boolean, intervalMs?: integer[100..60000], format?: "default" | "json" | "plain", localTime?: boolean }` (`follow=true` rejected in MCP)
-- `openclaw_gateway_probe { requireRpc?: boolean, deep?: boolean, noProbe?: boolean, timeoutMs?: integer[500..120000] }`
-- `openclaw_gateway_usage_cost { days?: integer[1..3650] }`
-- `openclaw_doctor { deep?: boolean, noWorkspaceSuggestions?: boolean }` (read-only only)
-- `openclaw_channels_list {}`
-- `openclaw_channels_status { probe?: boolean, timeoutMs?: integer[500..120000] }`
-- `openclaw_channels_logs { channel?: string, lines?: integer[1..5000] }`
-- `openclaw_models_status { check?: boolean, probe?: boolean, probeProvider?: string, probeProfileIds?: string[<=50], probeTimeoutMs?: integer[1000..120000], probeConcurrency?: integer[1..32], probeMaxTokens?: integer[1..32000], agentId?: string }`
-- `openclaw_models_list { agentId?: string }`
-- `openclaw_models_aliases_list {}` / `openclaw_models_fallbacks_list {}`
-- `openclaw_config_get { path: string }` (secret-bearing paths blocked)
-- `openclaw_config_file {}` / `openclaw_config_validate {}`
-- `openclaw_config_schema {}`
-- `openclaw_approvals_get { target?: "local" | "gateway" | "node", node?: string }`
-- `openclaw_devices_list {}`
-- `openclaw_nodes_list { connectedOnly?: boolean, lastConnected?: string }`
-- `openclaw_nodes_pending {}`
-- `openclaw_nodes_status { connectedOnly?: boolean, lastConnected?: string }`
-- `openclaw_skills_check {}`
-- `openclaw_system_presence {}`
+All parameters optional:
 
-Active probe tools: `openclaw_health(verbose=true)`, `openclaw_status(type=deep|all)`, `openclaw_gateway_probe`, `openclaw_channels_status(probe=true)`, `openclaw_models_status(probe=true)`.
+| Parameter | Type | Description |
+|---|---|---|
+| `verbose` | boolean | Include probe details in response |
+| `timeoutMs` | integer 1000–120000 | Call timeout in ms |
+
+### `openclaw_logs`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `limit` | integer 1–5000 | Max log lines to return |
+| `maxBytes` | integer 1–1000000 | Max response bytes |
+| `follow` | boolean | Streaming follow — rejected in MCP, must be omitted or `false` |
+| `intervalMs` | integer 100–60000 | Polling interval in ms |
+| `format` | `"default"` \| `"json"` \| `"plain"` | Output format |
+| `localTime` | boolean | Use local timestamps instead of UTC |
+
+### `openclaw_gateway_probe`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `requireRpc` | boolean | Fail if RPC layer is unavailable |
+| `deep` | boolean | Run deeper probes |
+| `noProbe` | boolean | Skip active probing |
+| `timeoutMs` | integer 500–120000 | Probe timeout in ms |
+
+### `openclaw_gateway_usage_cost`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `days` | integer 1–3650 | Look-back window in days |
+
+### `openclaw_doctor`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `deep` | boolean | Run deeper diagnostics |
+| `noWorkspaceSuggestions` | boolean | Omit workspace suggestions from output |
 
 ### `openclaw_gateway_status`
 
 No parameters. Checks gateway health (calls `GET /healthz`) and returns only curated safe fields.
+
+### `openclaw_channels_list`
+
+No parameters.
+
+### `openclaw_channels_status`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `probe` | boolean | Run active channel probes |
+| `timeoutMs` | integer 500–120000 | Probe timeout in ms |
+
+### `openclaw_channels_logs`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `channel` | string | Channel name filter |
+| `lines` | integer 1–5000 | Max log lines |
+
+### `openclaw_models_status`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `check` | boolean | Include auth/config checks |
+| `probe` | boolean | Run live provider probes |
+| `probeProvider` | string | Probe a specific provider only |
+| `probeProfileIds` | string[] (≤50 items) | Profile IDs to probe |
+| `probeTimeoutMs` | integer 1000–120000 | Per-probe timeout in ms |
+| `probeConcurrency` | integer 1–32 | Max concurrent probes |
+| `probeMaxTokens` | integer 1–32000 | Token limit for probe requests |
+| `agentId` | string | Target agent workspace |
+
+### `openclaw_models_list`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `agentId` | string | Target agent workspace |
+
+### `openclaw_models_aliases_list`
+
+No parameters.
+
+### `openclaw_models_fallbacks_list`
+
+No parameters.
+
+### `openclaw_config_get`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | string | yes | Config path to read; secret-bearing paths are blocked |
+
+### `openclaw_config_file`
+
+No parameters. Returns the active config file path.
+
+### `openclaw_config_validate`
+
+No parameters. Returns a config validation summary.
+
+### `openclaw_config_schema`
+
+No parameters. Returns the full config schema.
+
+### `openclaw_approvals_get`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `target` | `"local"` \| `"gateway"` \| `"node"` | Approval target scope |
+| `node` | string | Node identifier (used with `target: "node"`) |
+
+### `openclaw_devices_list`
+
+No parameters. Returns pending and paired devices with tokens redacted.
+
+### `openclaw_nodes_list`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `connectedOnly` | boolean | Return only currently connected nodes |
+| `lastConnected` | string | Duration filter, e.g. `"24h"` |
+
+### `openclaw_nodes_pending`
+
+No parameters.
+
+### `openclaw_nodes_status`
+
+All parameters optional:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `connectedOnly` | boolean | Return only currently connected nodes |
+| `lastConnected` | string | Duration filter, e.g. `"24h"` |
+
+### `openclaw_skills_check`
+
+No parameters. Returns skill readiness summary.
+
+### `openclaw_system_presence`
+
+No parameters. Returns current system presence entries.
 
 ### `openclaw_sessions_list`
 
