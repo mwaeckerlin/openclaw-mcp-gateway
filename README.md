@@ -163,6 +163,7 @@ In [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw)'s `docker-com
 This repository ships an OpenClaw skill at:
 
 - `SKILL.md` (root directory)
+- `/app/skills/openclaw-mcp-gateway/SKILL.md` (inside the production container image)
 
 OpenClaw skills are authored as a `SKILL.md` file with YAML frontmatter (`name`, `description`) plus markdown body instructions; OpenClaw discovers skills from the workspace skills directory:
 

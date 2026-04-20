@@ -12,4 +12,5 @@ FROM mwaeckerlin/nodejs as production
 EXPOSE 4000
 COPY --from=build /app/dist /app/dist
 COPY --from=modules /app/node_modules node_modules
+COPY --from=build /app/SKILL.md /app/skills/openclaw-mcp-gateway/SKILL.md
 CMD ["dist/server.js"]
