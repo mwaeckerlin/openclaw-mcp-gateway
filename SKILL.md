@@ -7,9 +7,44 @@ description: Use this skill when you need to inspect or control an OpenClaw Gate
 
 MCP gateway that exposes a strict allowlist of read-only and cron-management tools against an OpenClaw Gateway backend. Credentials stay outside SSH sandbox agents.
 
+## Local installation (deterministic)
+
+Use these rules when told to install this skill locally.
+
+- **Source file in this repository:** `/home/runner/work/openclaw-mcp-gateway/openclaw-mcp-gateway/SKILL.md`
+- **Canonical installed skill file (active location):** `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
+- **Any other copied file path is not an installation** (for example, temporary files or copies elsewhere in the workspace do not activate the skill).
+
+Installation procedure:
+
+1. Ensure target directory exists: `~/.openclaw/workspace/skills/openclaw-mcp-gateway/`
+2. Write this skill to exactly `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
+3. If a file already exists at that path, **overwrite it in place**
+4. Verify visibility with OpenClaw skills tooling, for example:
+   - `openclaw skills list` (confirm `openclaw-mcp-gateway` appears)
+   - `openclaw skills detail openclaw-mcp-gateway` (confirm the installed skill resolves)
+
 ## First step
 
 **Always call `openclaw_gateway_status` first.** If it returns `ok: false` or throws, the gateway is unreachable — stop and report the error. Do not call other tools until connectivity is confirmed.
+
+## MCP transport preflight (required)
+
+For MCP HTTP requests, the client must send an `Accept` header that allows **both**:
+
+- `application/json`
+- `text/event-stream`
+
+If either is missing, the gateway can reject the call with: `Not Acceptable: Client must accept both application/json and text/event-stream`.
+
+## Selector requirements (common traps)
+
+Use identifying selectors explicitly for these calls:
+
+- `openclaw_session_status`: provide one of `sessionKey` or `sessionId`
+- `openclaw_skills_detail`: provide one of `skillKey` or `name`
+- `openclaw_cron_update`: provide one of `id` or `jobId` (plus `patch`)
+- `openclaw_cron_remove`: provide one of `id` or `jobId`
 
 ## Tool selection guide
 

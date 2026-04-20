@@ -168,16 +168,24 @@ OpenClaw skills are authored as a `SKILL.md` file with YAML frontmatter (`name`,
 
 - `~/.openclaw/workspace/skills/<skill-name>/SKILL.md`
 
-### Deploy this skill
+### Deploy this skill (deterministic local install)
 
-*The easiest way* to install this skill is to upload the file `SKILL.md` or paste its content to your agent's chat, then **instruct your agent:**
-> Install this skill as a local OpenClaw skill in `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
+When installing the current skill locally, use these exact locations:
 
-Or you may copy the skill file *manually* to the right position, if you have access:
+- **Source file in this repository:** `/home/runner/work/openclaw-mcp-gateway/openclaw-mcp-gateway/SKILL.md`
+- **Canonical installed (active) skill file:** `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
+- **Any copied skill file at a different workspace path is not an installation** and does not activate this skill.
+
+Installation procedure:
+
+1. Ensure the target directory exists.
+2. Copy/write the repository `SKILL.md` to exactly `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`.
+3. If the target file already exists, **overwrite it in place**.
+4. Verify the skill is visible after install.
 
 ```bash
 mkdir -p ~/.openclaw/workspace/skills/openclaw-mcp-gateway
-cp SKILL.md ~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md
+cp /home/runner/work/openclaw-mcp-gateway/openclaw-mcp-gateway/SKILL.md ~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md
 openclaw skills list
 openclaw skills detail openclaw-mcp-gateway
 ```
