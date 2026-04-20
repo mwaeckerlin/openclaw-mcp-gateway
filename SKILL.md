@@ -13,28 +13,91 @@ Use this skill to operate the `openclaw-mcp-gateway` service safely and effectiv
 - Keeps gateway credentials outside SSH sandbox agents.
 - Supports read-only Gateway RPC tools (health, status, logs, probe, channels, models, config, approvals, nodes, devices, skills, presence) and cron management tools.
 
-## Setup Checklist
+## First step
 
-1. Verify `OPENCLAW_MCP_GATEWAY_URL` is set in your environment (check `echo $OPENCLAW_MCP_GATEWAY_URL`). Default: `http://openclaw-mcp-gateway:4000`.
-2. Verify the MCP gateway is reachable: `curl -s $OPENCLAW_MCP_GATEWAY_URL/healthz` should return `{"ok":true,"status":"ready"}`.
+Call `openclaw_gateway_status` before any other tool. If it returns `ok: false` or fails, stop and report the connectivity error — the gateway is unreachable. Do not proceed with other tools until the gateway is healthy.
 
-## How to call MCP tools
+## Tool selection guide
 
-Send HTTP POST requests to `$OPENCLAW_MCP_GATEWAY_URL` using the MCP JSON-RPC protocol:
+Choose the right tool for the task at hand:
 
-```bash
-curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-```
+### Health and diagnostics
 
-To invoke a tool:
+| Task | Tool |
+|---|---|
+| Quick reachability check | `openclaw_gateway_status` |
+| Full health snapshot with probe detail | `openclaw_health` (add `verbose: true`) |
+| Full RPC reachability and diagnosis | `openclaw_gateway_probe` |
+| Read-only diagnostics (no repair) | `openclaw_doctor` |
 
-```bash
-curl -s -X POST "$OPENCLAW_MCP_GATEWAY_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"openclaw_gateway_status","arguments":{}}}'
-```
+### Status and usage
+
+| Task | Tool |
+|---|---|
+| Summary status | `openclaw_status` (default `type`) |
+| Deep status including connected nodes | `openclaw_status` (`type: "deep"`) |
+| Usage/cost summary | `openclaw_status` (`type: "usage"`) or `openclaw_gateway_usage_cost` |
+| All status families at once | `openclaw_status` (`type: "all"`) |
+| Current system presence entries | `openclaw_system_presence` |
+
+### Logs
+
+| Task | Tool |
+|---|---|
+| Recent gateway logs | `openclaw_logs` |
+| Logs for one channel only | `openclaw_channels_logs` (pass `channel`) |
+
+### Channels and models
+
+| Task | Tool |
+|---|---|
+| What channel accounts are configured | `openclaw_channels_list` |
+| Are channels reachable right now | `openclaw_channels_status` (add `probe: true` for live checks) |
+| What models are available | `openclaw_models_list` |
+| Are model auth tokens valid | `openclaw_models_status` |
+| Model aliases | `openclaw_models_aliases_list` |
+| Model fallback chains | `openclaw_models_fallbacks_list` |
+
+### Config inspection
+
+| Task | Tool |
+|---|---|
+| Read a config value at a path | `openclaw_config_get` (required: `path`) |
+| Where is the active config file | `openclaw_config_file` |
+| Is the config valid | `openclaw_config_validate` |
+| Full config schema | `openclaw_config_schema` |
+
+### Approvals, devices, and nodes
+
+| Task | Tool |
+|---|---|
+| Effective exec approvals | `openclaw_approvals_get` |
+| Paired and pending devices | `openclaw_devices_list` |
+| Node list with optional filters | `openclaw_nodes_list` |
+| Only nodes awaiting pairing | `openclaw_nodes_pending` |
+| Node status with optional filters | `openclaw_nodes_status` |
+
+### Skills and sessions
+
+| Task | Tool |
+|---|---|
+| Are all skills ready | `openclaw_skills_check` |
+| List skills (with filtering/paging) | `openclaw_skills_list` |
+| Detail for one skill | `openclaw_skills_detail` (one of `skillKey` or `name` required) |
+| List active sessions | `openclaw_sessions_list` |
+| Status of one specific session | `openclaw_session_status` (one of `sessionKey` or `sessionId` required) |
+
+### Cron operations
+
+| Task | Tool |
+|---|---|
+| Is the scheduler running | `openclaw_cron_status` |
+| List jobs | `openclaw_cron_list` |
+| Create a job | `openclaw_cron_add` |
+| Modify an existing job | `openclaw_cron_update` |
+| Delete a job | `openclaw_cron_remove` |
+| Trigger a job now | `openclaw_cron_run` — **always follow up with `openclaw_cron_runs`** to confirm the outcome; the tool may only enqueue the job |
+| Check run history or outcome | `openclaw_cron_runs` |
 
 ## Available tools
 
