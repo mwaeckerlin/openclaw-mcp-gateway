@@ -64,45 +64,11 @@ test("openclaw_channels_status: rejects timeoutMs out of range", () => {
   assert.throws(() => validateReadonlyRpcToolArguments("openclaw_channels_status", { timeoutMs: 200 }), /between 500 and 120000/);
 });
 
-test("openclaw_channels_capabilities: accepts optional channel/account/target", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_channels_capabilities", { channel: "telegram", account: "mybot" }));
-});
-test("openclaw_channels_capabilities: rejects empty channel", () => {
-  assert.throws(() => validateReadonlyRpcToolArguments("openclaw_channels_capabilities", { channel: "" }), /non-empty string/);
-});
-
-test("openclaw_channels_resolve: requires entries", () => {
-  assert.throws(() => validateReadonlyRpcToolArguments("openclaw_channels_resolve", {}), /entries must contain/i);
-});
-test("openclaw_channels_resolve: enforces bounded entries for channels resolve", () => {
-  assert.throws(
-    () => validateReadonlyRpcToolArguments("openclaw_channels_resolve", { entries: new Array(51).fill("@user") }),
-    /at most 50/i
-  );
-});
-test("openclaw_channels_resolve: accepts valid entries with kind", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_channels_resolve", { entries: ["@alice"], kind: "user" }));
-});
-test("openclaw_channels_resolve: rejects invalid kind", () => {
-  assert.throws(() => validateReadonlyRpcToolArguments("openclaw_channels_resolve", { entries: ["#x"], kind: "org" }), /auto, user, group/);
-});
-
 test("openclaw_channels_logs: accepts valid args", () => {
   assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_channels_logs", { channel: "telegram", lines: 50 }));
 });
 test("openclaw_channels_logs: rejects lines out of range", () => {
   assert.throws(() => validateReadonlyRpcToolArguments("openclaw_channels_logs", { lines: 10000 }), /between 1 and 5000/);
-});
-
-test("openclaw_plugins_list: accepts enabledOnly + verbose", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_plugins_list", { enabledOnly: true, verbose: false }));
-});
-
-test("openclaw_plugins_inspect: requires id", () => {
-  assert.throws(() => validateReadonlyRpcToolArguments("openclaw_plugins_inspect", {}), /id is required/);
-});
-test("openclaw_plugins_inspect: accepts id", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_plugins_inspect", { id: "my-plugin" }));
 });
 
 test("openclaw_models_status: accepts valid args", () => {
@@ -140,21 +106,6 @@ test("openclaw_config_get: accepts valid path", () => {
   assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_config_get", { path: "server.port" }));
 });
 
-test("openclaw_config_schema_lookup: requires path for schema lookup", () => {
-  assert.throws(() => validateReadonlyRpcToolArguments("openclaw_config_schema_lookup", {}), /path is required/i);
-});
-test("openclaw_config_schema_lookup: accepts valid path", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_config_schema_lookup", { path: "server.port" }));
-});
-
-test("openclaw_security_audit: accepts deep flag", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_security_audit", { deep: true }));
-});
-
-test("openclaw_secrets_audit: accepts allowExec + check", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_secrets_audit", { allowExec: false, check: true }));
-});
-
 test("openclaw_approvals_get: accepts target=gateway", () => {
   assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_approvals_get", { target: "gateway" }));
 });
@@ -173,13 +124,6 @@ test("openclaw_nodes_list: accepts connectedOnly + lastConnected", () => {
 });
 test("openclaw_nodes_status: accepts valid args", () => {
   assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_nodes_status", { connectedOnly: false }));
-});
-
-test("openclaw_sandbox_explain: accepts optional sessionKey + agentId", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_sandbox_explain", { sessionKey: "main", agentId: "agent-1" }));
-});
-test("openclaw_sandbox_list: accepts browserOnly", () => {
-  assert.doesNotThrow(() => validateReadonlyRpcToolArguments("openclaw_sandbox_list", { browserOnly: true }));
 });
 
 // ---------------------------------------------------------- redactSensitive

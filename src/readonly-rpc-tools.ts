@@ -13,12 +13,7 @@ export type ReadonlyRpcToolName =
   | "openclaw_doctor"
   | "openclaw_channels_list"
   | "openclaw_channels_status"
-  | "openclaw_channels_capabilities"
-  | "openclaw_channels_resolve"
   | "openclaw_channels_logs"
-  | "openclaw_plugins_list"
-  | "openclaw_plugins_inspect"
-  | "openclaw_plugins_doctor"
   | "openclaw_models_status"
   | "openclaw_models_list"
   | "openclaw_models_aliases_list"
@@ -27,17 +22,12 @@ export type ReadonlyRpcToolName =
   | "openclaw_config_file"
   | "openclaw_config_validate"
   | "openclaw_config_schema"
-  | "openclaw_config_schema_lookup"
-  | "openclaw_security_audit"
-  | "openclaw_secrets_audit"
   | "openclaw_approvals_get"
   | "openclaw_devices_list"
   | "openclaw_nodes_list"
   | "openclaw_nodes_pending"
   | "openclaw_nodes_status"
   | "openclaw_skills_check"
-  | "openclaw_sandbox_explain"
-  | "openclaw_sandbox_list"
   | "openclaw_system_presence";
 
 const TOOL_NAMES: ReadonlyRpcToolName[] = [
@@ -49,12 +39,7 @@ const TOOL_NAMES: ReadonlyRpcToolName[] = [
   "openclaw_doctor",
   "openclaw_channels_list",
   "openclaw_channels_status",
-  "openclaw_channels_capabilities",
-  "openclaw_channels_resolve",
   "openclaw_channels_logs",
-  "openclaw_plugins_list",
-  "openclaw_plugins_inspect",
-  "openclaw_plugins_doctor",
   "openclaw_models_status",
   "openclaw_models_list",
   "openclaw_models_aliases_list",
@@ -63,17 +48,12 @@ const TOOL_NAMES: ReadonlyRpcToolName[] = [
   "openclaw_config_file",
   "openclaw_config_validate",
   "openclaw_config_schema",
-  "openclaw_config_schema_lookup",
-  "openclaw_security_audit",
-  "openclaw_secrets_audit",
   "openclaw_approvals_get",
   "openclaw_devices_list",
   "openclaw_nodes_list",
   "openclaw_nodes_pending",
   "openclaw_nodes_status",
   "openclaw_skills_check",
-  "openclaw_sandbox_explain",
-  "openclaw_sandbox_list",
   "openclaw_system_presence"
 ];
 
@@ -101,12 +81,7 @@ export const READONLY_RPC_TOOL_DEFINITIONS: Array<{
   { name: "openclaw_doctor", description: "Read-only diagnostics summary (no repair).", inputSchema: { type: "object", properties: { deep: { type: "boolean" }, noWorkspaceSuggestions: { type: "boolean" } }, additionalProperties: false } },
   { name: "openclaw_channels_list", description: "Configured channel accounts.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
   { name: "openclaw_channels_status", description: "Channel runtime status, optionally with probes. Uses gateway RPC method channels.status.", inputSchema: { type: "object", properties: { probe: { type: "boolean" }, timeoutMs: { type: "integer", minimum: 500, maximum: 120000 } }, additionalProperties: false } },
-  { name: "openclaw_channels_capabilities", description: "Channel capability hints and permissions. Uses gateway RPC method channels.capabilities (capability-conditional: returns capability error if the gateway does not support this method).", inputSchema: { type: "object", properties: { channel: { type: "string", minLength: 1 }, account: { type: "string", minLength: 1 }, target: { type: "string", minLength: 1 } }, additionalProperties: false } },
-  { name: "openclaw_channels_resolve", description: "Resolve channel names/mentions to IDs. Uses gateway RPC method channels.resolve (capability-conditional: returns capability error if the gateway does not support this method).", inputSchema: { type: "object", properties: { entries: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 50 }, channel: { type: "string", minLength: 1 }, account: { type: "string", minLength: 1 }, kind: { enum: ["auto", "user", "group"] } }, required: ["entries"], additionalProperties: false } },
   { name: "openclaw_channels_logs", description: "Bounded filtered channel logs with redaction. Uses gateway RPC method logs.tail filtered by channel.", inputSchema: { type: "object", properties: { channel: { type: "string", minLength: 1 }, lines: { type: "integer", minimum: 1, maximum: 5000 } }, additionalProperties: false } },
-  { name: "openclaw_plugins_list", description: "Plugin inventory. Uses gateway RPC method plugins.list (capability-conditional: returns capability error if the gateway does not support this method).", inputSchema: { type: "object", properties: { enabledOnly: { type: "boolean" }, verbose: { type: "boolean" } }, additionalProperties: false } },
-  { name: "openclaw_plugins_inspect", description: "Inspect one plugin. Uses gateway RPC method plugins.inspect (capability-conditional).", inputSchema: { type: "object", properties: { id: { type: "string", minLength: 1 } }, required: ["id"], additionalProperties: false } },
-  { name: "openclaw_plugins_doctor", description: "Plugin diagnostics (read-only). Uses gateway RPC method plugins.doctor (capability-conditional).", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
   { name: "openclaw_models_status", description: "Model/provider auth status and probes. Uses gateway RPC method models.authStatus.", inputSchema: { type: "object", properties: { check: { type: "boolean" }, probe: { type: "boolean" }, probeProvider: { type: "string", minLength: 1 }, probeProfileIds: { type: "array", items: { type: "string" }, maxItems: 50 }, probeTimeoutMs: { type: "integer", minimum: 1000, maximum: 120000 }, probeConcurrency: { type: "integer", minimum: 1, maximum: 32 }, probeMaxTokens: { type: "integer", minimum: 1, maximum: 32000 }, agentId: { type: "string", minLength: 1 } }, additionalProperties: false } },
   { name: "openclaw_models_list", description: "List available models. Uses gateway RPC method models.list.", inputSchema: { type: "object", properties: { agentId: { type: "string", minLength: 1 } }, additionalProperties: false } },
   { name: "openclaw_models_aliases_list", description: "List model aliases derived from config.get.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
@@ -115,17 +90,12 @@ export const READONLY_RPC_TOOL_DEFINITIONS: Array<{
   { name: "openclaw_config_file", description: "Active config file path derived from config.get.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
   { name: "openclaw_config_validate", description: "Read-only config validation result derived from config.get.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
   { name: "openclaw_config_schema", description: "Full config schema. Uses gateway RPC method config.schema.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "openclaw_config_schema_lookup", description: "Schema metadata for one path. Uses gateway RPC method config.schema.lookup (capability-conditional).", inputSchema: { type: "object", properties: { path: { type: "string", minLength: 1 } }, required: ["path"], additionalProperties: false } },
-  { name: "openclaw_security_audit", description: "Read-only security audit (no fix). Uses gateway RPC method security.audit (capability-conditional).", inputSchema: { type: "object", properties: { deep: { type: "boolean" } }, additionalProperties: false } },
-  { name: "openclaw_secrets_audit", description: "Read-only secrets audit with redaction. Uses gateway RPC method secrets.audit (capability-conditional).", inputSchema: { type: "object", properties: { allowExec: { type: "boolean" }, check: { type: "boolean" } }, additionalProperties: false } },
   { name: "openclaw_approvals_get", description: "Effective exec approvals snapshot. Uses gateway RPC methods exec.approvals.get / exec.approvals.node.get.", inputSchema: { type: "object", properties: { target: { enum: ["local", "gateway", "node"] }, node: { type: "string", minLength: 1 } }, additionalProperties: false } },
   { name: "openclaw_devices_list", description: "Pending and paired devices (tokens redacted). Uses gateway RPC method device.pair.list.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
   { name: "openclaw_nodes_list", description: "Node list with optional filters. Uses gateway RPC methods node.list and node.pair.list.", inputSchema: { type: "object", properties: { connectedOnly: { type: "boolean" }, lastConnected: { type: "string", minLength: 1 } }, additionalProperties: false } },
   { name: "openclaw_nodes_pending", description: "Pending node pairing requests. Uses gateway RPC method node.pair.list.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
   { name: "openclaw_nodes_status", description: "Node status view with optional filters. Uses gateway RPC methods node.list and node.pair.list.", inputSchema: { type: "object", properties: { connectedOnly: { type: "boolean" }, lastConnected: { type: "string", minLength: 1 } }, additionalProperties: false } },
   { name: "openclaw_skills_check", description: "Skill readiness check derived from skills.status RPC.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "openclaw_sandbox_explain", description: "Explain effective sandbox policy. Uses gateway RPC method sandbox.explain (capability-conditional).", inputSchema: { type: "object", properties: { sessionKey: { type: "string", minLength: 1 }, agentId: { type: "string", minLength: 1 } }, additionalProperties: false } },
-  { name: "openclaw_sandbox_list", description: "List sandbox runtimes. Uses gateway RPC method sandbox.list (capability-conditional).", inputSchema: { type: "object", properties: { browserOnly: { type: "boolean" } }, additionalProperties: false } },
   { name: "openclaw_system_presence", description: "Current gateway system presence entries. Uses gateway RPC method system-presence.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }
 ];
 
@@ -256,31 +226,9 @@ export function validateReadonlyRpcToolArguments(toolName: ReadonlyRpcToolName, 
       readBoolean(args, "probe");
       readInteger(args, "timeoutMs", 500, 120_000);
       break;
-    case "openclaw_channels_capabilities":
-      readString(args, "channel");
-      readString(args, "account");
-      readString(args, "target");
-      break;
-    case "openclaw_channels_resolve": {
-      // Runtime guard in addition to schema-level constraints.
-      const entries = readStringArray(args, "entries", 50);
-      if (!entries || entries.length === 0) throw new Error("arguments.entries must contain at least one entry");
-      readString(args, "channel");
-      readString(args, "account");
-      const kind = readString(args, "kind");
-      if (kind && !["auto", "user", "group"].includes(kind)) throw new Error("arguments.kind must be one of: auto, user, group");
-      break;
-    }
     case "openclaw_channels_logs":
       readString(args, "channel");
       readInteger(args, "lines", 1, 5000);
-      break;
-    case "openclaw_plugins_list":
-      readBoolean(args, "enabledOnly");
-      readBoolean(args, "verbose");
-      break;
-    case "openclaw_plugins_inspect":
-      readString(args, "id", true);
       break;
     case "openclaw_models_status":
       readBoolean(args, "check");
@@ -296,15 +244,7 @@ export function validateReadonlyRpcToolArguments(toolName: ReadonlyRpcToolName, 
       readString(args, "agentId");
       break;
     case "openclaw_config_get":
-    case "openclaw_config_schema_lookup":
       readString(args, "path", true);
-      break;
-    case "openclaw_security_audit":
-      readBoolean(args, "deep");
-      break;
-    case "openclaw_secrets_audit":
-      readBoolean(args, "allowExec");
-      readBoolean(args, "check");
       break;
     case "openclaw_approvals_get": {
       const target = readString(args, "target");
@@ -318,13 +258,6 @@ export function validateReadonlyRpcToolArguments(toolName: ReadonlyRpcToolName, 
     case "openclaw_nodes_status":
       readBoolean(args, "connectedOnly");
       readString(args, "lastConnected");
-      break;
-    case "openclaw_sandbox_explain":
-      readString(args, "sessionKey");
-      readString(args, "agentId");
-      break;
-    case "openclaw_sandbox_list":
-      readBoolean(args, "browserOnly");
       break;
     default:
       break;
@@ -476,23 +409,6 @@ export async function runReadonlyRpcToolWithArguments(
           null,
           2
         );
-      case "openclaw_channels_capabilities":
-        return JSON.stringify(
-          redactSensitive(await rpc(gatewayConfig, toolName, "channels.capabilities", {
-            channel: args.channel,
-            account: args.account,
-            target: args.target
-          }, 20_000, deviceIdentity)),
-          null,
-          2
-        );
-      case "openclaw_channels_resolve":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "channels.resolve", {
-          entries: args.entries,
-          channel: args.channel,
-          account: args.account,
-          kind: args.kind
-        }, 20_000, deviceIdentity)), null, 2);
       case "openclaw_channels_logs": {
         const linesLimit = (args.lines as number | undefined) ?? 200;
         const fetchLimit = Math.min(5000, Math.max(200, linesLimit * CHANNEL_LOGS_FETCH_OVERSAMPLING_FACTOR));
@@ -509,15 +425,6 @@ export async function runReadonlyRpcToolWithArguments(
           .slice(-linesLimit);
         return JSON.stringify(redactSensitive({ channel, lines: filtered, returned: filtered.length }), null, 2);
       }
-      case "openclaw_plugins_list":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "plugins.list", {
-          enabledOnly: args.enabledOnly === true,
-          verbose: args.verbose === true
-        }, 20_000, deviceIdentity)), null, 2);
-      case "openclaw_plugins_inspect":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "plugins.inspect", { id: args.id }, 20_000, deviceIdentity)), null, 2);
-      case "openclaw_plugins_doctor":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "plugins.doctor", {}, 20_000, deviceIdentity)), null, 2);
       case "openclaw_models_status": {
         const status = await rpc(gatewayConfig, toolName, "models.authStatus", { refresh: args.probe === true }, 20_000, deviceIdentity);
         const result: JsonObject = { status: redactSensitive(status) };
@@ -560,12 +467,6 @@ export async function runReadonlyRpcToolWithArguments(
       }
       case "openclaw_config_schema":
         return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "config.schema", {}, 15_000, deviceIdentity)), null, 2);
-      case "openclaw_config_schema_lookup":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "config.schema.lookup", { path: args.path }, 15_000, deviceIdentity)), null, 2);
-      case "openclaw_security_audit":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "security.audit", { deep: args.deep === true }, 20_000, deviceIdentity)), null, 2);
-      case "openclaw_secrets_audit":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "secrets.audit", { check: args.check === true, allowExec: args.allowExec === true }, 20_000, deviceIdentity)), null, 2);
       case "openclaw_approvals_get": {
         const target = (args.target as string | undefined) ?? "local";
         if (target === "node") {
@@ -632,10 +533,6 @@ export async function runReadonlyRpcToolWithArguments(
         const ready = skills.filter((entry) => entry.eligible === true).length;
         return JSON.stringify(redactSensitive({ ready, total: skills.length, skills }), null, 2);
       }
-      case "openclaw_sandbox_explain":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "sandbox.explain", { sessionKey: args.sessionKey, agentId: args.agentId }, 20_000, deviceIdentity)), null, 2);
-      case "openclaw_sandbox_list":
-        return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "sandbox.list", { browser: args.browserOnly === true }, 20_000, deviceIdentity)), null, 2);
       case "openclaw_system_presence":
         return JSON.stringify(redactSensitive(await rpc(gatewayConfig, toolName, "system-presence", {}, 12_000, deviceIdentity)), null, 2);
       default:

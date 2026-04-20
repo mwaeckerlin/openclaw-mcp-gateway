@@ -659,35 +659,6 @@ test("openclaw_channels_logs dispatches to logs.tail and filters by channel", as
   assert.equal(lines.length, 2);
 });
 
-test("openclaw_plugins_list dispatches to plugins.list with enabledOnly param", async () => {
-  const { methodFrame } = await driveSimpleRpc(
-    "openclaw_plugins_list", { enabledOnly: true },
-    "plugins.list",
-    { plugins: [{ id: "p1", enabled: true }] }
-  );
-  const mp = methodFrame.params as Record<string, unknown>;
-  assert.equal(mp.enabledOnly, true);
-});
-
-test("openclaw_plugins_inspect dispatches to plugins.inspect with id param", async () => {
-  const { methodFrame, parsed } = await driveSimpleRpc(
-    "openclaw_plugins_inspect", { id: "my-plugin" },
-    "plugins.inspect",
-    { id: "my-plugin", version: "1.0", enabled: true }
-  );
-  assert.equal((methodFrame.params as Record<string, unknown>).id, "my-plugin");
-  assert.equal(parsed.id, "my-plugin");
-});
-
-test("openclaw_plugins_doctor dispatches to plugins.doctor", async () => {
-  const { methodFrame } = await driveSimpleRpc(
-    "openclaw_plugins_doctor", {},
-    "plugins.doctor",
-    { ok: true, issues: [] }
-  );
-  assert.equal(methodFrame.method, "plugins.doctor");
-});
-
 test("openclaw_models_status dispatches to models.authStatus", async () => {
   const { methodFrame, parsed } = await driveSimpleRpc(
     "openclaw_models_status", { probe: false },
@@ -784,45 +755,6 @@ test("openclaw_config_schema dispatches to config.schema", async () => {
   assert.equal(methodFrame.method, "config.schema");
 });
 
-test("openclaw_config_schema_lookup dispatches to config.schema.lookup with path", async () => {
-  const { methodFrame, parsed } = await driveSimpleRpc(
-    "openclaw_config_schema_lookup", { path: "server.port" },
-    "config.schema.lookup",
-    { path: "server.port", type: "integer", description: "Port to listen on" }
-  );
-  assert.equal((methodFrame.params as Record<string, unknown>).path, "server.port");
-  assert.equal(parsed.type, "integer");
-});
-
-test("openclaw_security_audit dispatches to security.audit with deep param", async () => {
-  const { methodFrame } = await driveSimpleRpc(
-    "openclaw_security_audit", { deep: true },
-    "security.audit",
-    { ok: true, findings: [] }
-  );
-  assert.equal((methodFrame.params as Record<string, unknown>).deep, true);
-});
-
-test("openclaw_secrets_audit dispatches to secrets.audit with check + allowExec params", async () => {
-  const { methodFrame } = await driveSimpleRpc(
-    "openclaw_secrets_audit", { check: true, allowExec: false },
-    "secrets.audit",
-    { ok: true, residues: [] }
-  );
-  const mp = methodFrame.params as Record<string, unknown>;
-  assert.equal(mp.check, true);
-  assert.equal(mp.allowExec, false);
-});
-
-test("openclaw_secrets_audit redacts sensitive values in response", async () => {
-  const { parsed } = await driveSimpleRpc(
-    "openclaw_secrets_audit", {},
-    "secrets.audit",
-    { ok: true, token: "sk-real-secret-token", residues: [] }
-  );
-  assert.equal(parsed.token, "[REDACTED]");
-});
-
 test("openclaw_approvals_get target=local returns local-only note without RPC", async () => {
   // No WebSocket interaction expected for target=local (returns static note)
   const result = await runAllowedToolWithArguments("openclaw_approvals_get", { target: "local" }, TEST_CONFIG);
@@ -885,24 +817,6 @@ test("openclaw_skills_check dispatches to skills.status and counts eligible", as
   assert.equal(methodFrame.method, "skills.status");
   assert.equal(parsed.ready, 1);
   assert.equal(parsed.total, 2);
-});
-
-test("openclaw_sandbox_explain dispatches to sandbox.explain with sessionKey", async () => {
-  const { methodFrame } = await driveSimpleRpc(
-    "openclaw_sandbox_explain", { sessionKey: "main" },
-    "sandbox.explain",
-    { policy: "isolated", sessionKey: "main" }
-  );
-  assert.equal((methodFrame.params as Record<string, unknown>).sessionKey, "main");
-});
-
-test("openclaw_sandbox_list dispatches to sandbox.list with browser param", async () => {
-  const { methodFrame } = await driveSimpleRpc(
-    "openclaw_sandbox_list", { browserOnly: true },
-    "sandbox.list",
-    { runtimes: [{ name: "chromium" }] }
-  );
-  assert.equal((methodFrame.params as Record<string, unknown>).browser, true);
 });
 
 test("openclaw_system_presence dispatches to system-presence", async () => {
