@@ -91,46 +91,11 @@ MCP gateway that exposes a strict allowlist of read-only and cron-management too
 | Trigger a job now | `openclaw_cron_run` — **always follow up with `openclaw_cron_runs`**; the tool may only enqueue |
 | Check run history or outcome | `openclaw_cron_runs` |
 
-## Available tools
+## Complete tool list
 
-| MCP Tool | What it does |
-|---|---|
-| `openclaw_gateway_status` | Curated health fields from the gateway HTTP health endpoint |
-| `openclaw_health` | Full gateway health snapshot with optional probe detail |
-| `openclaw_status` | Status family summary (`default` / `deep` / `usage` / `all`) |
-| `openclaw_logs` | Bounded log tail with secret redaction |
-| `openclaw_gateway_probe` | Gateway and RPC reachability diagnostics |
-| `openclaw_gateway_usage_cost` | Usage cost summaries from session logs |
-| `openclaw_doctor` | Read-only diagnostics; no repair actions |
-| `openclaw_system_presence` | Current system presence entries |
-| `openclaw_channels_list` | Configured channel accounts |
-| `openclaw_channels_status` | Channel runtime status with optional live probes |
-| `openclaw_channels_logs` | Bounded channel log tail with redaction |
-| `openclaw_models_status` | Model/provider auth status with optional live probes |
-| `openclaw_models_list` | Available models for an agent workspace |
-| `openclaw_models_aliases_list` | Model aliases from active config |
-| `openclaw_models_fallbacks_list` | Model fallback chains from active config |
-| `openclaw_config_get` | Read one config path (secret-bearing paths blocked) |
-| `openclaw_config_file` | Active config file path |
-| `openclaw_config_validate` | Config validation result |
-| `openclaw_config_schema` | Full config JSON schema |
-| `openclaw_approvals_get` | Effective exec approvals snapshot |
-| `openclaw_devices_list` | Pending and paired devices (tokens redacted) |
-| `openclaw_nodes_list` | Node list with optional filters |
-| `openclaw_nodes_pending` | Nodes awaiting pairing |
-| `openclaw_nodes_status` | Node status view with optional filters |
-| `openclaw_skills_check` | Skill readiness summary |
-| `openclaw_sessions_list` | Read-only session list with paging |
-| `openclaw_session_status` | Read-only status for one session |
-| `openclaw_skills_list` | Skill inventory with filtering and paging |
-| `openclaw_skills_detail` | Detail for one skill by key or name |
-| `openclaw_cron_status` | Cron scheduler status |
-| `openclaw_cron_list` | List cron jobs with paging, filter, and sort |
-| `openclaw_cron_add` | Create a cron job |
-| `openclaw_cron_update` | Patch an existing cron job |
-| `openclaw_cron_remove` | Remove a cron job |
-| `openclaw_cron_run` | Trigger a job on demand (may only enqueue) |
-| `openclaw_cron_runs` | Inspect run outcomes and history |
+All exposed tools (use the selection guide above to pick the right one):
+
+`openclaw_gateway_status` · `openclaw_health` · `openclaw_status` · `openclaw_logs` · `openclaw_gateway_probe` · `openclaw_gateway_usage_cost` · `openclaw_doctor` · `openclaw_system_presence` · `openclaw_channels_list` · `openclaw_channels_status` · `openclaw_channels_logs` · `openclaw_models_status` · `openclaw_models_list` · `openclaw_models_aliases_list` · `openclaw_models_fallbacks_list` · `openclaw_config_get` · `openclaw_config_file` · `openclaw_config_validate` · `openclaw_config_schema` · `openclaw_approvals_get` · `openclaw_devices_list` · `openclaw_nodes_list` · `openclaw_nodes_pending` · `openclaw_nodes_status` · `openclaw_skills_check` · `openclaw_sessions_list` · `openclaw_session_status` · `openclaw_skills_list` · `openclaw_skills_detail` · `openclaw_cron_status` · `openclaw_cron_list` · `openclaw_cron_add` · `openclaw_cron_update` · `openclaw_cron_remove` · `openclaw_cron_run` · `openclaw_cron_runs`
 
 ## Cron job reference
 
