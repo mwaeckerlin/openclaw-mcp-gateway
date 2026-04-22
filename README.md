@@ -38,6 +38,7 @@ For reminder use cases, prefer this sequence:
 Typically, this server runs in such an environment, where the nodes are typically Docker containers in a Docker Swarm or Kubernetes pods, but could also be just virtual machines:
 
 ![](doc/architecture.svg)
+
 <details>
 <summary>PlantUML source</summary>
 ```plantuml
@@ -58,6 +59,7 @@ mcp -up-> gateway    : forward verified calls
 :AI-Agent: .down.> sandbox
 @enduml
 ```
+
 </details>
 
 ## Configuration
