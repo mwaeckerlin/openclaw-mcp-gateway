@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "build": "npm run build:doc && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "build:doc": "plantuml -tsvg -o doc README.md",
     "build:docker": "docker compose build",
     "test": "tsx --test src/commands.test.ts src/cron.test.ts src/disabled-tools.test.ts src/readonly-rpc-tools.test.ts src/skills.test.ts src/server.test.ts src/server.integration.test.ts && node test/generate-pairing.mjs && (cd test && docker compose up --build --force-recreate --remove-orphans --abort-on-container-exit --exit-code-from test-client)",
