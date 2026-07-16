@@ -1,6 +1,6 @@
 {
   "name": "openclaw-mcp-gateway",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server to give SSH-sandboxed AI agents limited access to the OpenClaw Gateway API.",
   "type": "module",
   "main": "dist/server.js",
@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "build:doc": "plantuml -tsvg -o doc README.md",
     "build:docker": "docker compose build",
-    "test": "tsx --test src/commands.test.ts src/cron.test.ts src/disabled-tools.test.ts src/readonly-rpc-tools.test.ts src/skills.test.ts src/server.test.ts src/server.integration.test.ts && node test/generate-pairing.mjs && (cd test && docker compose up --build --force-recreate --remove-orphans --abort-on-container-exit --exit-code-from test-client)",
+    "test": "tsx --test src/commands.test.ts src/cron.test.ts src/disabled-tools.test.ts src/readonly-rpc-tools.test.ts src/skills.test.ts src/server.test.ts src/server.integration.test.ts && npm run test:image && node test/generate-pairing.mjs && (cd test && docker compose up --build --force-recreate --remove-orphans --abort-on-container-exit --exit-code-from test-client)",
+    "test:image": "npm run build:docker && bash tests/image-contract.sh mwaeckerlin/openclaw-mcp-gateway",
     "start": "docker compose up --build --force-recreate --remove-orphans",
     "start:daemon": "docker compose up -d --build --force-recreate --remove-orphans",
     "dev": "tsx src/server.ts"
