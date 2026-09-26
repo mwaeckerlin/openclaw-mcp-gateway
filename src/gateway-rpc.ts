@@ -49,9 +49,11 @@ interface WebSocketLike {
 
 const DEFAULT_SCOPE = ["operator.admin", "operator.read"];
 
-// Gateway protocol version of OpenClaw; since 2026.9 the Gateway refuses
-// operator clients below 4 with "protocol mismatch"
-const GATEWAY_PROTOCOL = 4;
+// Gateway protocol versions of OpenClaw this client speaks: 2026.9 refuses
+// operator clients whose range does not reach 4 with "protocol mismatch",
+// earlier Gateways speak 3
+const GATEWAY_PROTOCOL_MIN = 3;
+const GATEWAY_PROTOCOL_MAX = 4;
 
 // Payload format matches openclaw gateway's buildDeviceAuthPayloadV3:
 // "v3|{deviceId}|{clientId}|{clientMode}|{role}|{scopes}|{signedAtMs}|{token}|{nonce}|{platform}|{deviceFamily}"
@@ -241,8 +243,8 @@ export async function callGatewayRpc(
         id: connectRequestId,
         method: "connect",
         params: {
-          minProtocol: GATEWAY_PROTOCOL,
-          maxProtocol: GATEWAY_PROTOCOL,
+          minProtocol: GATEWAY_PROTOCOL_MIN,
+          maxProtocol: GATEWAY_PROTOCOL_MAX,
           client: {
             id: "gateway-client",
             version: "1.0.0",

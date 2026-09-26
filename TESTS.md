@@ -25,7 +25,7 @@ Register of all tests, sorted by the [FEATURES.md](FEATURES.md) number each test
 - **F9** `src/server.test.ts` › cron.status, cron.list and cron.update dispatch; cron validation failure as InvalidParams.
 - **F10** `src/readonly-rpc-tools.test.ts` › redactSensitive removes token-like keys, credential and access_key, bearer tokens inside strings, nested objects, and truncates long arrays.
 - **F11** `src/server.test.ts` › capability error on gateway 404, 501 and endpoint_disabled; error on 500; timeout; network failure; unknown tool; error details from a JSON body; cron RPC auth failure, not supported and generic failure.
-- **F11** `src/cron.test.ts` › gateway-rpc challenge/connect/request flow with protocol 4, timeout, auth failure, non-ok response, malformed frame, transport error, connection closed before connect.
+- **F11** `src/cron.test.ts` › gateway-rpc challenge/connect/request flow with protocols 3 to 4, timeout, auth failure, non-ok response, malformed frame, transport error, connection closed before connect.
 - **F12** `src/disabled-tools.test.ts` › comma and whitespace separation, empty entries ignored, disabled tools hidden, exact names only.
 - **F12** `src/server.test.ts` › disabled tools refused with a clear error.
 - **F13** `src/commands.test.ts` › loadGatewayConfig reads URL and token, defaults the URL to http://openclaw:18789.

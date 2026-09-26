@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-09-26 **1.1.2**
+    - Works with OpenClaw Gateways before 2026.9 as well: the gateway offers protocols 3 to 4, and each Gateway picks the one it speaks
+
 - 2026-09-26 **1.1.1**
     - Works with OpenClaw 2026.9: the gateway connects with protocol 4, which OpenClaw now requires; before, every tool except the HTTP ones failed with «protocol mismatch»
     - The image is published for amd64 and arm64 under one tag, built, tested and published automatically on every change and every week
