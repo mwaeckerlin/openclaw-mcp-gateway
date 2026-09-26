@@ -1,18 +1,24 @@
 {
-  "name": "openclaw-mcp-gateway",
-  "version": "1.1.0",
+  "name": "@mwaeckerlin/openclaw-mcp-gateway",
+  "version": "1.1.1",
   "description": "MCP server to give SSH-sandboxed AI agents limited access to the OpenClaw Gateway API.",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "docker compose build",
+    "build:ts": "tsc -p tsconfig.json",
     "build:doc": "plantuml -tsvg -o doc README.md",
-    "build:docker": "docker compose build",
-    "test": "tsx --test src/commands.test.ts src/cron.test.ts src/disabled-tools.test.ts src/readonly-rpc-tools.test.ts src/skills.test.ts src/server.test.ts src/server.integration.test.ts && npm run test:image && node test/generate-pairing.mjs && (cd test && docker compose up --build --force-recreate --remove-orphans --abort-on-container-exit --exit-code-from test-client)",
-    "test:image": "npm run build:docker && bash tests/image-contract.sh mwaeckerlin/openclaw-mcp-gateway",
     "start": "docker compose up --build --force-recreate --remove-orphans",
     "start:daemon": "docker compose up -d --build --force-recreate --remove-orphans",
-    "dev": "tsx src/server.ts"
+    "start:dev": "docker compose up --build --force-recreate --remove-orphans",
+    "stop": "docker compose down",
+    "deploy": "docker compose push",
+    "dev": "tsx src/server.ts",
+    "test": "npm run test:docs && npm run test:unit && npm run test:image && npm run test:e2e",
+    "test:docs": "bash tests/docs-contract.sh",
+    "test:unit": "tsx --test src/*.test.ts",
+    "test:image": "npm run build && bash tests/image-contract.sh mwaeckerlin/openclaw-mcp-gateway",
+    "test:e2e": "node test/generate-pairing.mjs && (cd test && docker compose up --build --force-recreate --remove-orphans --abort-on-container-exit --exit-code-from test-client)"
   },
   "keywords": [
     "mcp",

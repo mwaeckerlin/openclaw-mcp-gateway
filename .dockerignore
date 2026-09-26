@@ -5,3 +5,6 @@ dist
 *.log
 npm-debug.log*
 .DS_Store
+# credentials of the test environment never enter a build context
+.env
+**/.env

@@ -51,6 +51,14 @@ for image in "$@"; do
     _no_interpreter "${image}" /bin/bash    bash    -c :
     _no_interpreter "${image}" /bin/busybox busybox ls /
     _no_interpreter "${image}" /usr/bin/perl perl   -e 1
+    # the agent instructions ship with the server, identical to SKILL.md here
+    SHIPPED=$(docker run --rm --pull=never --entrypoint /usr/bin/node "${image}" \
+        -e "process.stdout.write(require('fs').readFileSync('/app/skills/openclaw-mcp-gateway/SKILL.md', 'utf8'))" 2>&1)
+    if [[ "${SHIPPED}" == "$(cat "$(dirname "$0")/../SKILL.md")" ]]; then
+        _pass "${image}_skill_shipped"
+    else
+        _fail "${image}_skill_shipped" "/app/skills/openclaw-mcp-gateway/SKILL.md missing or different from SKILL.md"
+    fi
 done
 
 echo ""

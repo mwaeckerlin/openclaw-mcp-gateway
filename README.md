@@ -2,7 +2,7 @@
 
 Give sandboxed SSH AI agents controlled access to [OpenClaw](https://github.com/mwaeckerlin/openclaw) through this MCP gateway service.
 
-AI agents running inside SSH-isolated and Docker-sandboxed environments cannot — and should not — reach OpenClaw directly, i.e. they have no access to the OpenClaw CLI. The AI agent in the SSH sandbox could access directly to the gateway, if it had the gateway token. But it would be a security risk to expose the gateway token to the AI agent. Instead it talks only to this lightweight MCP service. The gateway enforces a hardcoded allowlist of operations: the AI agent cannot choose arbitrary Gateway methods, cannot bypass local schema validation for allowlisted tools, and cannot inject arbitrary commands. This makes the overall architecture significantly more secure than any setup where the AI has direct HTTP/WebSocket access to OpenClaw.
+AI agents running inside SSH-isolated and Docker-sandboxed environments cannot — and should not — reach OpenClaw directly, i.e. they have no access to the OpenClaw CLI. The AI agent in the SSH sandbox could access directly to the gateway, if it had the gateway token. But it would be a security risk to expose the gateway token to the AI agent. Instead it talks only to this lightweight MCP service. The gateway enforces a hardcoded allowlist of operations: the AI agent cannot choose arbitrary Gateway methods, cannot bypass local schema validation for allowlisted tools, and cannot inject arbitrary commands. This makes the overall architecture significantly more secure than any setup where the AI has direct HTTP/WebSocket access to OpenClaw.
 
 [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw) runs an OpenClaw Gateway and an SSH Sandbox in two isolated docker containers, so that the AI agent has absolutely no access to any secret or token or the gateway and its configuration.
 
@@ -20,8 +20,7 @@ Allows the SSH-sandboxed AI agent to:
  - **`openclaw_sessions_list` / `openclaw_session_status`:** read-only session visibility with explicit validation and bounded output.
  - **`openclaw_skills_list` / `openclaw_skills_detail`:** read-only skill visibility with curated metadata only.
  - **`openclaw_cron_status` / `openclaw_cron_list`:** inspect the cron scheduler and its jobs.
- - **`openclaw_cron_add` / `openclaw_cron_update` / `openclaw_cron_remove`:** manage `cron` and `at` jobs — set up jobs to be executed once or repeatedly at a specific time.  
-   For example, instruct your agent:
+ - **`openclaw_cron_add` / `openclaw_cron_update` / `openclaw_cron_remove`:** manage `cron` and `at` jobs — set up jobs to be executed once or repeatedly at a specific time. For example, instruct your agent:
    > "Send me a daily weather report from my location **every day at 8 am** in Telegram chat."
  - **`openclaw_cron_run` / `openclaw_cron_runs`:** trigger a job on demand and inspect its execution history.
 
@@ -80,7 +79,7 @@ The variables below are read by the **MCP gateway server process** itself. See [
 | `OPENCLAW_DEVICE_FILE` | no | Path to the persistent device identity file (default: `/run/openclaw/device.json`) |
 | `DISABLE_TOOLS` | no | Disable specific MCP tools by exact name (comma and/or whitespace separated) |
 
-\* In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
+\* In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
 
 Cron and Skills MCP tools use Gateway WebSocket RPC on the same Gateway base URL (`OPENCLAW_GATEWAY_URL`), converted internally from `http(s)` to `ws(s)`.
 
@@ -90,8 +89,7 @@ WebSocket RPC tools (`openclaw_cron_*`, `openclaw_skills_*`) authenticate to the
 
 1. **Device identity**: the MCP gateway holds a stable Ed25519 key pair.  At startup it reads it from:
    - `OPENCLAW_DEVICE_IDENTITY` env var (JSON string `{"deviceId":"…","publicKeyRaw":"…","privateKeyPem":"…"}`), or
-   - the file at `OPENCLAW_DEVICE_FILE` (default `/run/openclaw/device.json`).  
-   If neither exists a new key pair is generated and written to the file path.
+   - the file at `OPENCLAW_DEVICE_FILE` (default `/run/openclaw/device.json`). If neither exists a new key pair is generated and written to the file path.
 
 2. **Pre-provisioned pairing**: before starting the MCP gateway, the same device public key must be registered in the OpenClaw Gateway via the `OPENCLAW_DEVICE_PAIRING` env var on the Gateway side.  The value must be a JSON object **keyed by `deviceId`** and contain the full paired-device record, including `role`, `roles`, `approvedScopes`, and a non-revoked `tokens.operator` entry.  A record containing only `deviceId` + `publicKey` is **rejected** by the gateway because `listEffectivePairedDeviceRoles` returns `[]` when `tokens` is absent.
    ```json
@@ -120,10 +118,10 @@ WebSocket RPC tools (`openclaw_cron_*`, `openclaw_skills_*`) authenticate to the
 
 3. **WS connect**: when a WebSocket RPC call is needed the MCP gateway opens a WS connection, receives a `connect.challenge` event from the Gateway, signs the challenge nonce with its private key, and includes the `device` field in the `connect` request frame.  The Gateway verifies the signature against the pre-registered public key and grants the connection.
 
-**No runtime HTTP pairing calls are made.** The first WS connect succeeds directly as long as the device public key was pre-registered.
+The gateway makes no HTTP pairing call at run time: the first WS connect succeeds directly as long as the device public key was pre-registered.
 
 > ⚠️ **Pairing is incompatible with loopback shortcuts.**
-> Do not use `network_mode: service:openclaw` or point `OPENCLAW_GATEWAY_URL` at `127.0.0.1` / `localhost`.  Those tricks rely on `skipLocalBackendSelfPairing` inside the OpenClaw Gateway and bypass the pairing check entirely.  The proper flow — stable device identity + `OPENCLAW_DEVICE_PAIRING` — works correctly over any bridge or overlay network and is required for all real deployments.
+> Do not use `network_mode: service:openclaw` or point `OPENCLAW_GATEWAY_URL` at `127.0.0.1` / `localhost`.  Those tricks rely on `skipLocalBackendSelfPairing` inside the OpenClaw Gateway and bypass the pairing check entirely.  The proper flow — stable device identity + `OPENCLAW_DEVICE_PAIRING` — works correctly over any bridge or overlay network and is required for all real deployments.
 
 ### Network segregation and token security
 
@@ -131,14 +129,18 @@ WebSocket RPC tools (`openclaw_cron_*`, `openclaw_skills_*`) authenticate to the
 
 Use **two separate bridge (or overlay) networks**:
 
-```
+```text
 [openclaw] ←—openclaw-mcp-gateway—→ [mcp-gateway] ←—mcp-gateway-test-client—→ [AI-agent / client]
 ```
 
-- `openclaw-mcp-gateway` — carries the privileged operator token.  Only `openclaw` and `mcp-gateway` are attached.
-- `mcp-gateway-test-client` (or your production equivalent) — carries MCP tool-call traffic only.  Only `mcp-gateway` and the AI-agent container are attached.
+- `openclaw-mcp-gateway` — carries the privileged operator token.  Only `openclaw` and `mcp-gateway` are attached.
+- `mcp-gateway-test-client` (or your production equivalent) — carries MCP tool-call traffic only.  Only `mcp-gateway` and the AI-agent container are attached.
 
-**Why this matters:** if the AI agent and the OpenClaw Gateway share an L2 segment, the agent could use a packet capture tool to sniff the `Authorization: Bearer …` header that the MCP gateway sends on every HTTP and WebSocket request to the Gateway, obtaining the operator token and gaining unrestricted direct access to OpenClaw.  With separate networks the agent is never on the same segment as the token-carrying traffic, so packet capture on the client-facing network reveals no secrets.
+If the AI agent and the OpenClaw Gateway share an L2 segment, the agent could use a packet capture tool to sniff the `Authorization: Bearer …` header that the MCP gateway sends on every HTTP and WebSocket request to the Gateway, obtaining the operator token and gaining unrestricted direct access to OpenClaw.  With separate networks the agent is never on the same segment as the token-carrying traffic, so packet capture on the client-facing network reveals no secrets.
+
+### Trusted proxies of the Gateway
+
+The MCP gateway connects to the OpenClaw Gateway directly. When the address of the MCP gateway lies in the Gateway's `trustedProxies`, OpenClaw treats it as a reverse proxy, demands forwarded client headers, and answers every call with `403 proxy_attribution_required`. The image `mwaeckerlin/openclaw` trusts `10.0.0.0/8` and `172.16.0.0/12` by default, which covers every Docker network. Set `OPENCLAW_TRUSTED_PROXIES_JSON` on the Gateway to the addresses of the real reverse proxies only (for example the Traefik container), or to `[]` where no proxy stands in front of it.
 
 ### MCP client environment
 
@@ -150,9 +152,9 @@ The sandbox or agent container needs to know where to reach this MCP gateway. Se
 
 In [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw)'s `docker-compose.yml` this is pre-configured on the sandbox service and written to `/etc/environment` so SSH sessions inherit it automatically.
 
-### MCP server configuration vs client environment vs tool-call parameters
+### Configuration layers
 
-- **MCP gateway server configuration** (the variables in the [Configuration](#configuration) table above — `OPENCLAW_GATEWAY_URL`, auth token, `DISABLE_TOOLS`, etc.) controls how the gateway server process is started and what tools are exposed.
+- **MCP gateway server configuration** (the variables in the [Configuration](#configuration) table above — `OPENCLAW_GATEWAY_URL`, auth token, `DISABLE_TOOLS`, etc.) controls how the gateway server process is started and what tools are exposed.
 - **MCP client environment** (`OPENCLAW_MCP_GATEWAY_URL`, set on the sandbox/agent container) tells the agent where to connect. It is not read by the gateway server at all.
 - **Tool-call parameters** are the validated per-call `arguments` sent by MCP clients when invoking a tool.
 - Tool-call parameters cannot override disabled tools or bypass the allowlist/validation logic.
@@ -184,7 +186,7 @@ When installing this skill, use these exact locations:
 
 - **Source file in this repository:** `<repository-root>/SKILL.md`
 - **Canonical installed (active) skill file:** `~/.openclaw/workspace/skills/openclaw-mcp-gateway/SKILL.md`
-- **Any copied skill file at a different workspace path is not an installation** and does not activate this skill.
+- A copy of the skill file at any other workspace path is not an installation and does not activate this skill.
 
 Installation procedure:
 
@@ -244,9 +246,9 @@ openclaw skills detail openclaw-mcp-gateway
 | `openclaw_cron_run` | WebSocket RPC | `cron.run` | Triggers a job (may only enqueue) |
 | `openclaw_cron_runs` | WebSocket RPC | `cron.runs` | Inspects actual run outcomes/history |
 
-## Not Implemented — Awaiting Gateway RPC Support
+## Not Implemented
 
-The following tools were designed for this gateway but are **not exposed as MCP tools** because the OpenClaw Gateway does not currently expose the required functionality as a Gateway RPC method. They are available as local CLI commands only and therefore cannot be forwarded over the authenticated WebSocket RPC layer used by this gateway.
+These tools were designed for this gateway but are **not exposed as MCP tools**, because the OpenClaw Gateway offers no Gateway RPC method for them yet. They are available as local CLI commands only and therefore cannot be forwarded over the authenticated WebSocket RPC layer used by this gateway.
 
 | Intended MCP Tool | Would-be Gateway RPC | Functionality |
 |---|---|---|
@@ -280,7 +282,7 @@ All parameters optional:
 
 | Parameter | Type | Description |
 |---|---|---|
-| `type` | `"default"` \| `"deep"` \| `"usage"` \| `"all"` | Status depth — `deep` and `all` run active probes |
+| `type` | `"default"` \| `"deep"` \| `"usage"` \| `"all"` | Status depth — `deep` and `all` run active probes |
 
 ### `openclaw_logs`
 
@@ -290,7 +292,7 @@ All parameters optional:
 |---|---|---|
 | `limit` | integer 1–5000 | Max log lines to return |
 | `maxBytes` | integer 1–1000000 | Max response bytes |
-| `follow` | boolean | Streaming follow — rejected in MCP, must be omitted or `false` |
+| `follow` | boolean | Streaming follow — rejected in MCP, must be omitted or `false` |
 | `intervalMs` | integer 100–60000 | Polling interval in ms |
 | `format` | `"default"` \| `"json"` \| `"plain"` | Output format |
 | `localTime` | boolean | Use local timestamps instead of UTC |
@@ -508,17 +510,17 @@ All parameters optional:
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | **yes** | Job name |
-| `schedule` | object | **yes** | Schedule — see [Schedule](#schedule) |
+| `schedule` | object | **yes** | Schedule — see [Schedule](#schedule) |
 | `sessionTarget` | string | **yes** | `"main"` \| `"isolated"` \| `"current"` \| `"session:<id>"` |
 | `wakeMode` | string | **yes** | `"now"` \| `"next-heartbeat"` |
-| `payload` | object | **yes** | What to deliver — see [Payload](#payload) |
+| `payload` | object | **yes** | What to deliver — see [Payload](#payload) |
 | `description` | string | no | Human-readable description |
 | `enabled` | boolean | no | Start enabled (default true) |
 | `deleteAfterRun` | boolean | no | Remove job after first successful run |
 | `agentId` | string \| null | no | Target agent override |
 | `sessionKey` | string \| null | no | Session key override |
-| `delivery` | object | no | How to notify — see [Delivery](#delivery) |
-| `failureAlert` | `false` \| object | no | Alert after repeated failures — see [FailureAlert](#failurealert) |
+| `delivery` | object | no | How to notify — see [Delivery](#delivery) |
+| `failureAlert` | `false` \| object | no | Alert after repeated failures — see [FailureAlert](#failurealert) |
 
 ### `openclaw_cron_update`
 
@@ -528,7 +530,7 @@ Exactly one of `id` or `jobId` is required, plus `patch`:
 |---|---|---|---|
 | `id` | string | one-of | Internal job UUID |
 | `jobId` | string | one-of | Human-readable job name/id |
-| `patch` | object | **yes** | Fields to update (all optional, same fields as `openclaw_cron_add` plus `state` — see [State Patch](#state-patch)) |
+| `patch` | object | **yes** | Fields to update (all optional, same fields as `openclaw_cron_add` plus `state` — see [State Patch](#state-patch)) |
 
 ### `openclaw_cron_remove`
 
@@ -549,7 +551,7 @@ Exactly one of `id` or `jobId` is required:
 | `jobId` | string | one-of | Human-readable job name/id |
 | `mode` | `"due"` \| `"force"` | no | `force` ignores schedule; `due` runs only if due |
 
-> **Note:** `openclaw_cron_run` may return `enqueued: true` — the run is scheduled but not yet complete. Use `openclaw_cron_runs` to inspect the actual execution outcome.
+> **Note:** `openclaw_cron_run` may return `enqueued: true` — the run is scheduled but not yet complete. Use `openclaw_cron_runs` to inspect the actual execution outcome.
 
 ### `openclaw_cron_runs`
 
@@ -620,13 +622,13 @@ One of two kinds:
 | `kind` | `"systemEvent"` \| `"agentTurn"` | all | Payload type |
 | `text` | string | `systemEvent` | Event text |
 | `message` | string | `agentTurn` | Prompt for the agent |
-| `model` | string | — | Model override |
-| `fallbacks` | string[] | — | Fallback model list |
-| `thinking` | string | — | Thinking mode hint |
-| `timeoutSeconds` | number ≥0 | — | Agent turn timeout in seconds |
-| `allowUnsafeExternalContent` | boolean | — | Allow fetching external content |
-| `lightContext` | boolean | — | Use minimal context window |
-| `toolsAllow` | string[] | — | Allowed tool names for this turn |
+| `model` | string | — | Model override |
+| `fallbacks` | string[] | — | Fallback model list |
+| `thinking` | string | — | Thinking mode hint |
+| `timeoutSeconds` | number ≥0 | — | Agent turn timeout in seconds |
+| `allowUnsafeExternalContent` | boolean | — | Allow fetching external content |
+| `lightContext` | boolean | — | Use minimal context window |
+| `toolsAllow` | string[] | — | Allowed tool names for this turn |
 
 ### Delivery
 
@@ -683,21 +685,17 @@ Available only inside `openclaw_cron_update`'s `patch.state`. Used to manually c
 
 ## Security
 
-This service provides three independent layers of security. You do not have to trust any single layer — all three must be bypassed simultaneously to compromise the system.
+This service provides three independent layers of security. You do not have to trust any single layer — all three must be bypassed simultaneously to compromise the system.
 
-**1. Sandbox isolation — the AI agent cannot reach OpenClaw or the internet directly.**
-The AI agent runs inside a Docker container or SSH-isolated environment. That environment should not bear any token. Only the OpenClawGateway and the MCP server holds the OpenClaw gateway token. Even if the AI is manipulated or "jailbroken", it cannot contact the OpenClaw gateway, because it has no token.
+1. **Sandbox isolation.** The AI agent cannot reach OpenClaw or the internet directly. The AI agent runs inside a Docker container or SSH-isolated environment. That environment should not bear any token. Only the OpenClawGateway and the MCP server holds the OpenClaw gateway token. Even if the AI is manipulated or "jailbroken", it cannot contact the OpenClaw gateway, because it has no token.
 
-**2. Fixed-allowlist MCP gateway — the AI agent cannot choose what it sends.**
-Every MCP tool call is mapped to a single, hardcoded OpenClaw operation defined at build time. There is no generic passthrough, no dynamic method selection beyond explicit tool names, no shell execution, and no eval. Cron tools accept structured arguments but reject unknown top-level fields and validate supported shapes locally before forwarding to Gateway RPC. The AI cannot escalate a `tools/list` or `openclaw_status` call into arbitrary Gateway access. The MCP gateway is the only component with network access to OpenClaw, and it acts as a strict one-way firewall.
+2. **Fixed-allowlist MCP gateway.** The AI agent cannot choose what it sends. Every MCP tool call is mapped to a single, hardcoded OpenClaw operation defined at build time. There is no generic passthrough, no dynamic method selection beyond explicit tool names, no shell execution, and no eval. Cron tools accept structured arguments but reject unknown top-level fields and validate supported shapes locally before forwarding to Gateway RPC. The AI cannot escalate a `tools/list` or `openclaw_status` call into arbitrary Gateway access. The MCP gateway is the only component with network access to OpenClaw, and it acts as a strict one-way firewall.
 
-**3. Hardened container image — the runtime has the smallest possible attack surface.**
-The production image is built on [`mwaeckerlin/nodejs`](https://github.com/mwaeckerlin/nodejs), a purpose-built, minimal Node.js base image. It runs as a non-root user, contains no shell or package manager, and ships only the files required to execute the application. The total image size is only **91.8 MB**. There is nothing inside the container that an attacker could use to escalate privileges or pivot to other systems.
+3. **Hardened container image.** The runtime has the smallest possible attack surface. The production image is built on [`mwaeckerlin/nodejs`](https://github.com/mwaeckerlin/nodejs), a purpose-built, minimal Node.js base image. It runs as a non-root user, contains no shell or package manager, and ships only the files required to execute the application. The total image size is only **91.8 MB**. There is nothing inside the container that an attacker could use to escalate privileges or pivot to other systems.
 
 ## MCP Client Configuration Example
 
-Use this JSON in an MCP-capable client to register this service as a remote MCP server.
-This is client configuration, not a tool-call payload.
+Use this JSON in an MCP-capable client to register this service as a remote MCP server. This is client configuration, not a tool-call payload.
 
 It tells the client:
 
@@ -727,42 +725,35 @@ There is an e2e test case in `test` that runs in a Docker Compose environment an
 Checkout `package.json`:
 
 ```bash
-npm install
-npm run build         # compiles TypeScript to dist/
-npm run build:docker  # builds the Docker image
-npm test              # runs unit tests, then E2E tests inside Docker Compose
+$ npm install
+$ npm run build:ts    # compiles TypeScript to dist/
+$ npm run build       # builds the Docker image
+$ npm test            # feature register, unit tests, image contract, then E2E tests inside Docker Compose
+$ npm run deploy      # pushes the image
 ```
 
-## TODO — Missing Gateway RPC Calls
+The image is built, tested and published for `linux/amd64` and `linux/arm64` by the reusable workflow of [mwaeckerlin/scratch](https://github.com/mwaeckerlin/scratch#publishing-on-docker-hub).
+
+## TODO — Missing Gateway RPC Calls
 
 The items below are blocked on the OpenClaw Gateway exposing the listed method over its authenticated WebSocket RPC interface. Each entry tracks one planned MCP tool. Implement when the Gateway adds support.
 
-- [ ] **`openclaw_channels_capabilities`** — needs Gateway RPC `channels.capabilities`  
-  Return capability hints and permissions for a channel account (e.g. which message types, file attachments, or reactions are supported). Parameters: `channel?`, `account?`, `target?`.
+- [ ] **`openclaw_channels_capabilities`** — needs Gateway RPC `channels.capabilities` Return capability hints and permissions for a channel account (e.g. which message types, file attachments, or reactions are supported). Parameters: `channel?`, `account?`, `target?`.
 
-- [ ] **`openclaw_channels_resolve`** — needs Gateway RPC `channels.resolve`  
-  Resolve a list of `#channel` names or `@user` mentions to their canonical IDs. Parameters: `entries: string[1..50]`, `channel?`, `account?`, `kind?: "auto" | "user" | "group"`.
+- [ ] **`openclaw_channels_resolve`** — needs Gateway RPC `channels.resolve` Resolve a list of `#channel` names or `@user` mentions to their canonical IDs. Parameters: `entries: string[1..50]`, `channel?`, `account?`, `kind?: "auto" | "user" | "group"`.
 
-- [ ] **`openclaw_plugins_list`** — needs Gateway RPC `plugins.list`  
-  Return the installed plugin inventory with enable/disable state and version info. Parameters: `enabledOnly?`, `verbose?`.
+- [ ] **`openclaw_plugins_list`** — needs Gateway RPC `plugins.list` Return the installed plugin inventory with enable/disable state and version info. Parameters: `enabledOnly?`, `verbose?`.
 
-- [ ] **`openclaw_plugins_inspect`** — needs Gateway RPC `plugins.inspect`  
-  Inspect the configuration and runtime state of a single plugin by ID. Parameters: `id: string`.
+- [ ] **`openclaw_plugins_inspect`** — needs Gateway RPC `plugins.inspect` Inspect the configuration and runtime state of a single plugin by ID. Parameters: `id: string`.
 
-- [ ] **`openclaw_plugins_doctor`** — needs Gateway RPC `plugins.doctor`  
-  Read-only health diagnostics for all installed plugins; reports issues without applying any fix.
+- [ ] **`openclaw_plugins_doctor`** — needs Gateway RPC `plugins.doctor` Read-only health diagnostics for all installed plugins; reports issues without applying any fix.
 
-- [ ] **`openclaw_security_audit`** — needs Gateway RPC `security.audit`  
-  Read-only audit of the gateway's security configuration (permissions, TLS, auth settings). Never applies repairs. Parameters: `deep?`.
+- [ ] **`openclaw_security_audit`** — needs Gateway RPC `security.audit` Read-only audit of the gateway's security configuration (permissions, TLS, auth settings). Never applies repairs. Parameters: `deep?`.
 
-- [ ] **`openclaw_secrets_audit`** — needs Gateway RPC `secrets.audit`  
-  Read-only audit of configured secret references; all secret values are fully redacted in the response. Parameters: `check?`, `allowExec?`.
+- [ ] **`openclaw_secrets_audit`** — needs Gateway RPC `secrets.audit` Read-only audit of configured secret references; all secret values are fully redacted in the response. Parameters: `check?`, `allowExec?`.
 
-- [ ] **`openclaw_sandbox_explain`** — needs Gateway RPC `sandbox.explain`  
-  Explain the effective sandbox policy (allowed syscalls, network rules, filesystem mounts) for a given session or agent. Parameters: `sessionKey?`, `agentId?`.
+- [ ] **`openclaw_sandbox_explain`** — needs Gateway RPC `sandbox.explain` Explain the effective sandbox policy (allowed syscalls, network rules, filesystem mounts) for a given session or agent. Parameters: `sessionKey?`, `agentId?`.
 
-- [ ] **`openclaw_sandbox_list`** — needs Gateway RPC `sandbox.list`  
-  List available sandbox runtimes and their capabilities. Parameters: `browserOnly?`.
+- [ ] **`openclaw_sandbox_list`** — needs Gateway RPC `sandbox.list` List available sandbox runtimes and their capabilities. Parameters: `browserOnly?`.
 
-- [ ] **`openclaw_config_schema_lookup`** — needs correct request shape for existing Gateway RPC `config.schema.lookup`  
-  Look up schema metadata (type, description, allowed values) for a specific config path. The Gateway RPC method exists and is confirmed supported; the implementation was removed when the request shape (parameter name / path format) could not be verified against a live gateway response. Restore once the correct shape is confirmed. Parameters: `path: string`.
+- [ ] **`openclaw_config_schema_lookup`** — needs correct request shape for existing Gateway RPC `config.schema.lookup` Look up schema metadata (type, description, allowed values) for a specific config path. The Gateway RPC method exists and is confirmed supported; the implementation was removed when the request shape (parameter name / path format) could not be verified against a live gateway response. Restore once the correct shape is confirmed. Parameters: `path: string`.

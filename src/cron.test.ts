@@ -146,6 +146,9 @@ test("gateway-rpc succeeds with challenge/connect/request flow", async () => {
   assert.equal(connectFrame.method, "connect");
   assert.equal(typeof connectFrame.id, "string");
   assert.equal((connectFrame.params as Record<string, unknown>).role, "operator");
+  // OpenClaw 2026.9 accepts operator clients with protocol 4 only
+  assert.equal((connectFrame.params as Record<string, unknown>).minProtocol, 4);
+  assert.equal((connectFrame.params as Record<string, unknown>).maxProtocol, 4);
 
   ws.emitMessage({
     type: "res",

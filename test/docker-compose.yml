@@ -15,6 +15,11 @@ services:
       # gateway's device identity so the first WS connect succeeds directly
       # without any runtime HTTP pairing round-trip.
       OPENCLAW_DEVICE_PAIRING: ${OPENCLAW_E2E_DEVICE_PAIRING:-}
+      # No reverse proxy stands between mcp-gateway and the gateway here. A
+      # trusted proxy range that covers mcp-gateway's address makes OpenClaw
+      # demand forwarded client headers and answer every call with 403
+      # proxy_attribution_required.
+      OPENCLAW_TRUSTED_PROXIES_JSON: "[]"
     networks:
       - openclaw-mcp-gateway
     healthcheck:
