@@ -11,7 +11,7 @@ Numbered register of every feature; a number is never reused. Every feature is c
 - **F7 — Sessions.** `openclaw_sessions_list` lists sessions with bounded paging; `openclaw_session_status` shows one session named by exactly one target.
 - **F8 — Skills.** `openclaw_skills_list`, `openclaw_skills_detail` and `openclaw_skills_check` show the visible skills, one skill by `skillKey` or `name`, and their readiness, without file paths.
 - **F9 — Scheduled jobs.** `openclaw_cron_status`, `openclaw_cron_list`, `openclaw_cron_add`, `openclaw_cron_update`, `openclaw_cron_remove`, `openclaw_cron_run` and `openclaw_cron_runs` manage the cron jobs of the gateway; every argument is checked before the call.
-- **F10 — Secrets redacted.** Tokens, credentials, access keys and bearer strings are removed from every answer.
+- **F10 — Secrets redacted.** Tokens, credentials, access keys and bearer strings are removed from every answer: under every secret-named key, and in free text such as log lines wherever a token of a known service stands (Telegram, Slack, GitHub, Discord, Google, Notion, OpenAI and Anthropic keys, JWTs, private-key blocks, passwords in URLs, `key=value` pairs), and the bridge's own gateway token by its exact value.
 - **F11 — Clear errors.** A refused login, a gateway without the capability, a timeout, a network failure and a malformed answer each come back as their own MCP error.
 - **F12 — Tools switched off by the operator.** `DISABLE_TOOLS` names tools that are hidden from `tools/list` and refused when called.
 - **F13 — Configuration of the connection.** `OPENCLAW_GATEWAY_URL`, `OPENCLAW_MCP_HOST` and `OPENCLAW_MCP_PORT` set the gateway address and the listening address; `http` and `https` addresses become `ws` and `wss` for the RPC connection.

@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-09-28 **1.1.3**
+    - Tokens are also removed from free text such as gateway log lines: a Telegram bot token, Slack, GitHub, Discord, Google and Notion tokens, API keys, JWTs, private keys, passwords in URLs and the bridge's own gateway token no longer reach the sandbox; before, only bearer strings and `sk-` keys were removed there
+
 - 2026-09-26 **1.1.2**
     - Works with OpenClaw Gateways before 2026.9 as well: the gateway offers protocols 3 to 4, and each Gateway picks the one it speaks
 

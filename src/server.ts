@@ -28,6 +28,7 @@ import {
 } from "./skills.js";
 import {
   isReadonlyRpcToolName,
+  registerSecretValue,
   runReadonlyRpcToolWithArguments,
   validateReadonlyRpcToolArguments
 } from "./readonly-rpc-tools.js";
@@ -415,6 +416,9 @@ async function handleMcpHttpRequest(
 
 export async function main(): Promise<void> {
   const gatewayConfig = loadGatewayConfig();
+  // the bridge's own gateway token has no recognisable shape, so it is
+  // removed by its exact value from everything returned to the sandbox
+  registerSecretValue(gatewayConfig.token);
   const disabledTools = loadDisabledToolsFromEnv();
   const port = getMcpListenPort();
   const host = getMcpListenHost();

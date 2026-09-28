@@ -159,10 +159,52 @@ function isNodeConnected(entry: JsonObject): boolean {
   return entry.connected === true || entry.online === true || entry.status === "connected";
 }
 
+// Credential shapes a log line or a free-text field can carry. The sandbox
+// reads gateway logs and config text through this bridge, so every token
+// format of a service the gateway talks to is removed from free text, not
+// only under a secret-named key. Measured 2026-09-28: the former rule caught
+// only Bearer and sk- values, and a Telegram token (digits:secret) passed.
+const TOKEN_PATTERNS: RegExp[] = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  // Telegram bot token, also inside api.telegram.org/bot<token>/ URLs
+  /\d{6,12}:[A-Za-z0-9_-]{30,}/g,
+  // Slack bot, user, app and configuration tokens
+  /\bx(?:ox[abposre]|app)-[A-Za-z0-9-]{10,}/g,
+  // GitHub classic and fine-grained tokens
+  /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g,
+  // Discord bot token: base64 user id, timestamp, HMAC
+  /\b[MNO][A-Za-z0-9_-]{17,30}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{27,}/g,
+  // JSON Web Tokens
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+  // Google API keys
+  /\bAIza[0-9A-Za-z_-]{30,}/g,
+  // Notion integration tokens
+  /\b(?:secret|ntn)_[A-Za-z0-9]{30,}/g,
+  // OpenAI, Anthropic, OpenRouter and similar sk- keys
+  /\bsk-[A-Za-z0-9_-]{12,}/g
+];
+// a value after a secret-named key in text: botToken=…, "apiKey":"…", password: …
+const KEY_VALUE_PATTERN =
+  /((?:token|secret|password|passwd|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|credential)["']?\s*[:=]\s*["']?)([^\s"',;&}]{6,})/gi;
+// user:password@ in URLs
+const URL_CREDENTIAL_PATTERN = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:)[^\s/@]+@/gi;
+
+// exact values this process holds itself (the gateway token); they are
+// removed whatever their shape
+const SECRET_VALUES = new Set<string>();
+
+export function registerSecretValue(value: string | undefined): void {
+  if (value && value.trim().length >= 6) SECRET_VALUES.add(value.trim());
+}
+
 function redactString(value: string): string {
-  return value
-    .replace(/Bearer\s+[A-Za-z0-9._\-+/=]+/gi, "Bearer [REDACTED]")
-    .replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, "[REDACTED]");
+  let out = value;
+  for (const secret of SECRET_VALUES) out = out.split(secret).join("[REDACTED]");
+  out = out.replace(/Bearer\s+[A-Za-z0-9._\-+/=]+/gi, "Bearer [REDACTED]");
+  out = out.replace(URL_CREDENTIAL_PATTERN, "$1[REDACTED]@");
+  out = out.replace(KEY_VALUE_PATTERN, (match, prefix: string, secret: string) => (secret === "[REDACTED]" ? match : `${prefix}[REDACTED]`));
+  for (const pattern of TOKEN_PATTERNS) out = out.replace(pattern, "[REDACTED]");
+  return out;
 }
 
 export function redactSensitive(value: unknown): unknown {

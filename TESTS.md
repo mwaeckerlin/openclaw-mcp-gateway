@@ -23,7 +23,7 @@ Register of all tests, sorted by the [FEATURES.md](FEATURES.md) number each test
 - **F8** `src/server.test.ts` › openclaw_skills_list via skills.status, selected skill detail, openclaw_skills_check counts eligible skills.
 - **F9** `src/cron.test.ts` › cron.status, cron.list, cron.add, cron.update, cron.remove, cron.run, cron.runs — every accepted and refused argument.
 - **F9** `src/server.test.ts` › cron.status, cron.list and cron.update dispatch; cron validation failure as InvalidParams.
-- **F10** `src/readonly-rpc-tools.test.ts` › redactSensitive removes token-like keys, credential and access_key, bearer tokens inside strings, nested objects, and truncates long arrays.
+- **F10** `src/readonly-rpc-tools.test.ts` › redactSensitive removes token-like keys, credential and access_key, bearer tokens inside strings, nested objects, and truncates long arrays; it removes a Telegram, Slack, GitHub, Discord, Google, Notion and Anthropic token, a JWT, a password in a URL and key-value pairs from free text, removes a registered secret by its exact value, and keeps ordinary log text.
 - **F11** `src/server.test.ts` › capability error on gateway 404, 501 and endpoint_disabled; error on 500; timeout; network failure; unknown tool; error details from a JSON body; cron RPC auth failure, not supported and generic failure.
 - **F11** `src/cron.test.ts` › gateway-rpc challenge/connect/request flow with protocols 3 to 4, timeout, auth failure, non-ok response, malformed frame, transport error, connection closed before connect.
 - **F12** `src/disabled-tools.test.ts` › comma and whitespace separation, empty entries ignored, disabled tools hidden, exact names only.

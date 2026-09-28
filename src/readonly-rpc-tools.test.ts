@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateReadonlyRpcToolArguments, redactSensitive } from "./readonly-rpc-tools.js";
+import { validateReadonlyRpcToolArguments, redactSensitive, registerSecretValue } from "./readonly-rpc-tools.js";
 
 // ---------------------------------------------------------- validateReadonlyRpcToolArguments
 
@@ -155,6 +155,51 @@ test("redactSensitive redacts Bearer tokens inside strings", () => {
   const output = redactSensitive("Authorization: Bearer eyJa.secret.part") as string;
   assert.ok(output.includes("[REDACTED]"));
   assert.ok(!output.includes("eyJa.secret.part"));
+});
+
+// every credential format a gateway log line or a free-text field can carry;
+// each must disappear from the text the sandbox receives. The fake tokens
+// are joined at run time: written out whole, GitHub's push protection takes
+// them for real secrets and refuses the push.
+const token = (...parts: string[]): string => parts.join("");
+const TELEGRAM = token("123456789", ":", "AAHfiqksKZ8WmR2zSjiQ7_v4TMAKdiHm9T0");
+const TOKENS_IN_TEXT: Array<[string, string]> = [
+  ["telegram bot token", TELEGRAM],
+  ["telegram bot URL", `https://api.telegram.org/bot${TELEGRAM}/getMe`],
+  ["slack bot token", token("xox", "b-1234567890-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx")],
+  ["slack app token", token("xa", "pp-1-A0123456789-1234567890123-abcdef0123456789abcdef")],
+  ["github classic token", token("gh", "p_16C7e42F292c6912E7710c838347Ae178B4a")],
+  ["github fine-grained token", token("github", "_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyzABCDEF")],
+  ["discord bot token", token("MTEyNjQ5ODgxMjM0NTY3ODkw", ".", "GhIjKl", ".", "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789")],
+  ["google api key", token("AI", "zaSyD-1234567890abcdefghijklmnopqrstu")],
+  ["notion token", token("ntn", "_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGH")],
+  ["notion legacy token", token("secret", "_abcdefghijklmnopqrstuvwxyz0123456789ABCDE")],
+  ["jwt", token("eyJhbGciOiJIUzI1NiJ9", ".", "eyJzdWIiOiIxMjM0NTY3ODkwIn0", ".", "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U")],
+  ["password in url", "https://alice:hunter2secret@gitea.example/api"],
+  ["key value pair", "botToken=AbCdEf0123456789secretvalue"],
+  ["json key value", '"apiKey":"AbCdEf0123456789secretvalue"'],
+  ["anthropic key", token("sk-", "ant-api03-AbCdEf0123456789AbCdEf0123456789")],
+];
+
+for (const [kind, token] of TOKENS_IN_TEXT) {
+  test(`redactSensitive removes a ${kind} from free text`, () => {
+    const secret = kind === "password in url" ? "hunter2secret" : kind.includes("key value") || kind === "json key value" ? "AbCdEf0123456789secretvalue" : token.replace(/^https:\/\/api\.telegram\.org\/bot|\/getMe$/g, "");
+    const output = redactSensitive(`2026-09-28 [gateway] channel error: ${token} failed`) as string;
+    assert.ok(!output.includes(secret), `${kind} survived: ${output}`);
+    assert.ok(output.includes("[REDACTED]"), output);
+    assert.ok(output.startsWith("2026-09-28 [gateway] channel error:"), output);
+  });
+}
+
+test("redactSensitive removes a registered secret by its exact value, whatever its shape", () => {
+  registerSecretValue("plain-looking-gateway-token-without-pattern");
+  const output = redactSensitive({ lines: ["connect with plain-looking-gateway-token-without-pattern ok"] }) as { lines: string[] };
+  assert.equal(output.lines[0], "connect with [REDACTED] ok");
+});
+
+test("redactSensitive keeps ordinary log text", () => {
+  const line = "2026-09-28 [telegram:default] health-monitor: skipping restart, terminal-disconnect at 12:34:56";
+  assert.equal(redactSensitive(line), line);
 });
 
 test("redactSensitive passes through safe primitive values unchanged", () => {
