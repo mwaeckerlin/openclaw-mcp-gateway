@@ -1,5 +1,10 @@
 # Changelog
 
+- 2026-10-15 **1.1.4**
+    - The gateway token is read from the Docker secret `openclaw_gateway_token` again: the server looked for it at `/run/secret/openclaw_gateway_token`, while Docker mounts secrets under `/run/secrets/`, so in Docker Swarm it found no token and stopped at the start; a secret mounted at `/run/secret/openclaw_gateway_token`, as the README described before, is still read
+    - The start error without a token names the Docker secret path beside the variables
+    - The development commands in the README can be copied as they stand, without a `$ ` prompt
+
 - 2026-09-28 **1.1.3**
     - Tokens are also removed from free text such as gateway log lines: a Telegram bot token, Slack, GitHub, Discord, Google and Notion tokens, API keys, JWTs, private keys, passwords in URLs and the bridge's own gateway token no longer reach the sandbox; before, only bearer strings and `sk-` keys were removed there
 

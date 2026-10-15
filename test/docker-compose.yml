@@ -27,6 +27,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+      # the gateway imports the device pairing with openclaw doctor before it
+      # starts, which takes minutes
+      start_period: 10m
 
   mcp-gateway:
     build:
@@ -48,11 +51,14 @@ services:
     environment:
       # DNS name of the openclaw gateway container on the shared bridge network.
       OPENCLAW_GATEWAY_URL: http://openclaw:18789
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_E2E_GATEWAY_TOKEN:-test-gateway-token}
       # Stable device identity injected by test/generate-pairing.mjs.  The
       # matching public key is pre-registered in the Gateway via
       # OPENCLAW_DEVICE_PAIRING so the first WS connect succeeds directly.
       OPENCLAW_DEVICE_IDENTITY: ${OPENCLAW_E2E_DEVICE_IDENTITY:-}
+    # the gateway token only as a Docker secret, mounted where Docker mounts
+    # every secret: /run/secrets/openclaw_gateway_token
+    secrets:
+      - openclaw_gateway_token
     depends_on:
       openclaw:
         condition: service_healthy
@@ -86,3 +92,8 @@ services:
 networks:
   openclaw-mcp-gateway:
   mcp-gateway-test-client:
+
+# the token test/generate-pairing.mjs writes into test/.env for this run
+secrets:
+  openclaw_gateway_token:
+    environment: OPENCLAW_E2E_GATEWAY_TOKEN

@@ -6,6 +6,7 @@ Register of all tests, sorted by the [FEATURES.md](FEATURES.md) number each test
 
 `npm run test:unit` runs `src/*.test.ts` with the Node.js test runner.
 
+- **F1** `src/commands.test.ts` › the gateway token is looked up as Docker secret under `/run/secrets`, then under `/run/secret`; the first file found is read, the second when the first is missing, and without any token the error names the variables and both files.
 - **F2** `src/readonly-rpc-tools.test.ts` › openclaw_health, openclaw_status, openclaw_logs, openclaw_gateway_probe, openclaw_gateway_usage_cost, openclaw_doctor — accepted and refused arguments.
 - **F2** `src/server.test.ts` › openclaw_health, openclaw_logs, openclaw_gateway_usage_cost dispatch; openclaw_status via the status RPC family; openclaw_logs follow mode refused; openclaw_gateway_status text body and empty body.
 - **F2** `src/commands.test.ts` › shapeHttpToolResponse curates openclaw_gateway_status fields using allowlist.
@@ -28,14 +29,13 @@ Register of all tests, sorted by the [FEATURES.md](FEATURES.md) number each test
 - **F11** `src/cron.test.ts` › gateway-rpc challenge/connect/request flow with protocols 3 to 4, timeout, auth failure, non-ok response, malformed frame, transport error, connection closed before connect.
 - **F12** `src/disabled-tools.test.ts` › comma and whitespace separation, empty entries ignored, disabled tools hidden, exact names only.
 - **F12** `src/server.test.ts` › disabled tools refused with a clear error.
-- **F13** `src/commands.test.ts` › loadGatewayConfig reads URL and token, defaults the URL to http://openclaw:18789.
-- **F13** `src/cron.test.ts` › gateway-rpc url converts http to ws and https to wss.
+- **F13** `src/commands.test.ts` › loadGatewayConfig reads URL and token, defaults the URL to http://openclaw:18789.- **F13** `src/cron.test.ts` › gateway-rpc url converts http to ws and https to wss.
 
 ## End-to-end
 
 `npm run test:e2e` generates a device pairing, starts a local OpenClaw Gateway (`mwaeckerlin/openclaw:gateway`) and this server, and runs `test/e2e.mjs` in a separate container. No test reaches an external system.
 
-- **F1** `test/e2e.mjs` › the client reaches the MCP server over its own network and holds no gateway token.
+- **F1** `test/e2e.mjs` › the client reaches the MCP server over its own network and holds no gateway token; the MCP server takes the gateway token only from the Docker secret `openclaw_gateway_token` at `/run/secrets/openclaw_gateway_token`, a random one per run, and every following tool reaches the gateway with it.
 - **F2** `test/e2e.mjs` › openclaw_gateway_status, openclaw_status, openclaw_health, openclaw_logs, openclaw_gateway_probe, openclaw_gateway_usage_cost, openclaw_doctor against the running gateway.
 - **F3** `test/e2e.mjs` › openclaw_channels_list, openclaw_channels_status, openclaw_channels_logs.
 - **F4** `test/e2e.mjs` › openclaw_models_status, openclaw_models_list, openclaw_models_aliases_list, openclaw_models_fallbacks_list.

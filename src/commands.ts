@@ -439,11 +439,21 @@ function validateGatewayToken(token: string): string {
   return token;
 }
 
+/**
+ * Where the gateway token is looked up as Docker secret, in this order: Docker
+ * mounts every secret under /run/secrets; the README up to 1.1.3 named
+ * /run/secret, and deployments that mount the secret there keep working.
+ */
+export const GATEWAY_TOKEN_SECRET_FILES: readonly string[] = [
+  "/run/secrets/openclaw_gateway_token",
+  "/run/secret/openclaw_gateway_token"
+];
+
 function readSecret(
   inlineEnvVar: string,
   fileEnvVar: string | undefined,
   legacyInlineEnvVar?: string,
-  defaultFilePath?: string
+  defaultFilePaths: readonly string[] = []
 ): string {
   const inline = process.env[inlineEnvVar]?.trim();
   if (inline) {
@@ -469,7 +479,8 @@ function readSecret(
     }
   }
 
-  if (defaultFilePath && existsSync(defaultFilePath)) {
+  for (const defaultFilePath of defaultFilePaths) {
+    if (!existsSync(defaultFilePath)) continue;
     const fileValue = readFileSync(defaultFilePath, "utf8").trim();
     if (fileValue) {
       return validateGatewayToken(fileValue);
@@ -479,19 +490,15 @@ function readSecret(
 
   const inlineHint = legacyInlineEnvVar ? `${inlineEnvVar} or ${legacyInlineEnvVar}` : inlineEnvVar;
   const fileHint = fileEnvVar ?? "";
-  throw new Error(`Set ${inlineHint}${fileHint ? ` or ${fileHint}` : ""}`);
+  const secretHint = defaultFilePaths.length > 0 ? `, or provide the Docker secret ${defaultFilePaths.join(" or ")}` : "";
+  throw new Error(`Set ${inlineHint}${fileHint ? ` or ${fileHint}` : ""}${secretHint}`);
 }
 
-export function loadGatewayConfig(): GatewayConfig {
+export function loadGatewayConfig(secretFiles: readonly string[] = GATEWAY_TOKEN_SECRET_FILES): GatewayConfig {
   const baseUrlEnv = process.env.OPENCLAW_GATEWAY_URL?.trim() || "http://openclaw:18789";
 
   return {
     baseUrl: normalizeUrl(baseUrlEnv),
-    token: readSecret(
-      "OPENCLAW_GATEWAY_TOKEN",
-      undefined,
-      "OPENCLAW_GATEWAY_KEY",
-      "/run/secret/openclaw_gateway_token"
-    )
+    token: readSecret("OPENCLAW_GATEWAY_TOKEN", undefined, "OPENCLAW_GATEWAY_KEY", secretFiles)
   };
 }

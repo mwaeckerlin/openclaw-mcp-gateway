@@ -64,7 +64,7 @@ mcp -up-> gateway    : forward verified calls
 ## Configuration
 
 > ⚠️ **Production rule: never pass secrets as environment variables.**
-> Use Docker secrets instead (mounted at `/run/secret/openclaw_gateway_token`). Environment variables can leak through log files, `/proc`, container inspection, and child processes.
+> Use the Docker secret `openclaw_gateway_token` instead, which Docker mounts at `/run/secrets/openclaw_gateway_token`. Environment variables can leak through log files, `/proc`, container inspection, and child processes.
 
 The variables below are read by the **MCP gateway server process** itself. See [MCP client environment](#mcp-client-environment) for the client-side variable (`OPENCLAW_MCP_GATEWAY_URL`) that belongs on the sandbox/agent container, not here.
 
@@ -79,7 +79,7 @@ The variables below are read by the **MCP gateway server process** itself. See [
 | `OPENCLAW_DEVICE_FILE` | no | Path to the persistent device identity file (default: `/run/openclaw/device.json`) |
 | `DISABLE_TOOLS` | no | Disable specific MCP tools by exact name (comma and/or whitespace separated) |
 
-\* In production, mount the token as a Docker secret at `/run/secret/openclaw_gateway_token` — no environment variable needed.
+\* In production, hand the token over as the Docker secret `openclaw_gateway_token`; the server reads it from `/run/secrets/openclaw_gateway_token` when neither variable is set, and from `/run/secret/openclaw_gateway_token` where a deployment mounts it there, as the README up to 1.1.3 described.
 
 Cron and Skills MCP tools use Gateway WebSocket RPC on the same Gateway base URL (`OPENCLAW_GATEWAY_URL`), converted internally from `http(s)` to `ws(s)`.
 
@@ -725,11 +725,11 @@ There is an e2e test case in `test` that runs in a Docker Compose environment an
 Checkout `package.json`:
 
 ```bash
-$ npm install
-$ npm run build:ts    # compiles TypeScript to dist/
-$ npm run build       # builds the Docker image
-$ npm test            # feature register, unit tests, image contract, then E2E tests inside Docker Compose
-$ npm run deploy      # pushes the image
+npm install
+npm run build:ts    # compiles TypeScript to dist/
+npm run build       # builds the Docker image
+npm test            # feature register, unit tests, image contract, then E2E tests inside Docker Compose
+npm run deploy      # pushes the image
 ```
 
 The image is built, tested and published for `linux/amd64` and `linux/arm64` by the reusable workflow of [mwaeckerlin/scratch](https://github.com/mwaeckerlin/scratch#publishing-on-docker-hub).

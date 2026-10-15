@@ -2,7 +2,7 @@
 
 Numbered register of every feature; a number is never reused. Every feature is covered by tests listed in [TESTS.md](TESTS.md); the guard `tests/docs-contract.sh` fails when a feature has no test.
 
-- **F1 — Gateway credentials stay on the MCP server.** `OPENCLAW_GATEWAY_TOKEN` and the device identity are configured on this server only; a sandboxed agent calls it over MCP and never sees them.
+- **F1 — Gateway credentials stay on the MCP server.** `OPENCLAW_GATEWAY_TOKEN`, or the Docker secret `openclaw_gateway_token`, and the device identity are configured on this server only; a sandboxed agent calls it over MCP and never sees them.
 - **F2 — Gateway diagnosis.** `openclaw_health`, `openclaw_status`, `openclaw_gateway_probe`, `openclaw_gateway_usage_cost`, `openclaw_doctor` and `openclaw_gateway_status` read the state of the OpenClaw Gateway; `openclaw_logs` reads a bounded part of the log and refuses `follow`.
 - **F3 — Channels.** `openclaw_channels_list`, `openclaw_channels_status` and `openclaw_channels_logs` show the configured channel accounts, their runtime status and their log lines.
 - **F4 — Models.** `openclaw_models_status`, `openclaw_models_list`, `openclaw_models_aliases_list` and `openclaw_models_fallbacks_list` show the model and provider state, the model list, aliases and fallbacks.

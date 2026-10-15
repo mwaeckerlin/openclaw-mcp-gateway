@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   ALLOWED_HTTP_GATEWAY_OPERATIONS,
+  GATEWAY_TOKEN_SECRET_FILES,
   buildHttpInvokePayload,
   loadGatewayConfig,
   shapeHttpToolResponse,
@@ -110,6 +114,56 @@ test("loadGatewayConfig reads gateway URL and token from env vars", () => {
       assert.equal(config.token, "token-value");
     }
   );
+});
+
+// the secret files in a directory of the test, in the order of the server:
+// the Docker default first, the path of the earlier README second
+function withSecretFiles(contents: (string | undefined)[], run: (paths: string[]) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), "gateway-token-"));
+  try {
+    const paths = contents.map((_, index) => join(dir, `secret-${index}`));
+    contents.forEach((content, index) => {
+      if (content !== undefined) writeFileSync(paths[index], content);
+    });
+    withEnv({ OPENCLAW_GATEWAY_TOKEN: undefined, OPENCLAW_GATEWAY_KEY: undefined }, () => run(paths));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("the gateway token is looked up as Docker secret under /run/secrets, then under /run/secret", () => {
+  assert.deepEqual(GATEWAY_TOKEN_SECRET_FILES, [
+    "/run/secrets/openclaw_gateway_token",
+    "/run/secret/openclaw_gateway_token"
+  ]);
+});
+
+test("loadGatewayConfig reads the token from the Docker secret file", () => {
+  withSecretFiles(["secret-token\n", undefined], (paths) => {
+    assert.equal(loadGatewayConfig(paths).token, "secret-token");
+  });
+});
+
+test("loadGatewayConfig reads the token from the second secret file when the first is missing", () => {
+  withSecretFiles([undefined, "legacy-token\n"], (paths) => {
+    assert.equal(loadGatewayConfig(paths).token, "legacy-token");
+  });
+});
+
+test("loadGatewayConfig prefers the first secret file over the second", () => {
+  withSecretFiles(["secret-token", "legacy-token"], (paths) => {
+    assert.equal(loadGatewayConfig(paths).token, "secret-token");
+  });
+});
+
+test("loadGatewayConfig without token names the variables and every secret file", () => {
+  withSecretFiles([undefined, undefined], (paths) => {
+    assert.throws(
+      () => loadGatewayConfig(paths),
+      (error: Error) =>
+        error.message.includes("OPENCLAW_GATEWAY_TOKEN") && paths.every((path) => error.message.includes(path))
+    );
+  });
 });
 
 test("loadGatewayConfig defaults OPENCLAW_GATEWAY_URL to http://openclaw:18789", () => {

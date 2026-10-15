@@ -2,7 +2,7 @@
 /**
  * Generate a fresh Ed25519 device keypair for E2E tests.
  *
- * Outputs two environment variables to test/.env that docker compose reads:
+ * Outputs three environment variables to test/.env that docker compose reads:
  *
  *   OPENCLAW_E2E_DEVICE_IDENTITY
  *     JSON-encoded DeviceIdentity for the MCP gateway container.
@@ -13,6 +13,10 @@
  *     JSON-encoded pairing record for the OpenClaw Gateway container.
  *     Passed in via OPENCLAW_DEVICE_PAIRING so the Gateway accepts the
  *     device on the very first WS connect — no runtime HTTP pairing needed.
+ *
+ *   OPENCLAW_E2E_GATEWAY_TOKEN
+ *     A random gateway token for this run: the Gateway's environment, and the
+ *     Docker secret openclaw_gateway_token of the MCP gateway.
  *
  * Usage:
  *   node test/generate-pairing.mjs
@@ -88,9 +92,15 @@ function envValue(obj) {
   return JSON.stringify(JSON.stringify(obj));
 }
 
+// The gateway token of the run: the OpenClaw Gateway takes it from its
+// environment, the MCP gateway only as the Docker secret
+// openclaw_gateway_token, the way a production deployment hands it over.
+const gatewayToken = randomBytes(32).toString("base64url");
+
 const envContent = [
   `OPENCLAW_E2E_DEVICE_IDENTITY=${envValue(deviceIdentity)}`,
   `OPENCLAW_E2E_DEVICE_PAIRING=${envValue(devicePairing)}`,
+  `OPENCLAW_E2E_GATEWAY_TOKEN=${gatewayToken}`,
   ""
 ].join("\n");
 
