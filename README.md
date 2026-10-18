@@ -166,6 +166,15 @@ In [mwaeckerlin/openclaw](https://github.com/mwaeckerlin/openclaw)'s `docker-com
 - Disabled tools are hidden from `tools/list`.
 - Calls to disabled tools are rejected with a clear disabled/not-allowed error.
 
+### Health check
+
+`GET /healthz` of the bridge asks the OpenClaw gateway's own `/healthz` (3s timeout) and answers HTTP `200` in both cases:
+
+- the gateway answers: `{"ok":true,"status":"ready","gateway":{"url":"http://openclaw:18789/","reachable":true,"detail":"HTTP 200"}}`
+- the gateway does not answer: `"status":"waiting for gateway"` with `"detail":"not reachable: ECONNREFUSED"`, or `no answer within 3000ms`
+
+The image carries a `HEALTHCHECK` that prints this answer and runs `/usr/bin/node` directly, because the image has no shell. The container stays healthy while the gateway starts, so Swarm does not restart it; it turns unhealthy only when the bridge itself does not answer. `docker inspect --format '{{json .State.Health}}' <container>` shows the last answers, and the log names the start, the gateway address and every change of its reachability.
+
 ## OpenClaw SKILL
 
 This repository ships an OpenClaw skill at:

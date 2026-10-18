@@ -381,6 +381,54 @@ function respondJson(res: ServerResponse, statusCode: number, body: Record<strin
   res.end(JSON.stringify(body));
 }
 
+export interface HealthReport {
+  ok: true;
+  status: "ready" | "waiting for gateway";
+  gateway: { url: string; reachable: boolean; detail: string };
+}
+
+const GATEWAY_PROBE_TIMEOUT_MS = 3000;
+
+function failureCause(error: unknown): string {
+  const cause = error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined;
+  const code = cause && typeof cause === "object" && "code" in cause ? String((cause as { code: unknown }).code) : "";
+  if (code) return code;
+  if (error instanceof Error && error.name === "TimeoutError") return `no answer within ${GATEWAY_PROBE_TIMEOUT_MS}ms`;
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * State of this bridge for the image's HEALTHCHECK. The bridge itself is
+ * healthy whenever it answers; whether the OpenClaw gateway behind it answers
+ * is reported beside it, so that a gateway still starting reads «waiting for
+ * gateway» and a bridge that does not answer at all reads as broken.
+ */
+export async function healthReport(gatewayConfig: GatewayConfig): Promise<HealthReport> {
+  const url = new URL("/healthz", gatewayConfig.baseUrl).toString();
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(GATEWAY_PROBE_TIMEOUT_MS) });
+    await response.body?.cancel();
+    return { ok: true, status: "ready", gateway: { url: gatewayConfig.baseUrl, reachable: true, detail: `HTTP ${response.status}` } };
+  } catch (error: unknown) {
+    return {
+      ok: true,
+      status: "waiting for gateway",
+      gateway: { url: gatewayConfig.baseUrl, reachable: false, detail: `not reachable: ${failureCause(error)}` }
+    };
+  }
+}
+
+// the log names every change of the gateway's reachability once, so that a
+// task that stays in «Starting» says why
+let lastGatewayDetail: string | undefined;
+
+function logGatewayChange(report: HealthReport): void {
+  const line = report.gateway.reachable ? "reachable" : report.gateway.detail;
+  if (line === lastGatewayDetail) return;
+  lastGatewayDetail = line;
+  console.error(`OpenClaw MCP Gateway: gateway ${report.gateway.url} ${line}`);
+}
+
 async function handleMcpHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -391,7 +439,9 @@ async function handleMcpHttpRequest(
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
   if (requestUrl.pathname === "/healthz" && req.method === "GET") {
-    respondJson(res, 200, { ok: true, status: "ready" });
+    const report = await healthReport(gatewayConfig);
+    logGatewayChange(report);
+    respondJson(res, 200, { ...report });
     return;
   }
 
@@ -415,7 +465,9 @@ async function handleMcpHttpRequest(
 }
 
 export async function main(): Promise<void> {
+  console.error("OpenClaw MCP Gateway: starting");
   const gatewayConfig = loadGatewayConfig();
+  console.error(`OpenClaw MCP Gateway: gateway ${gatewayConfig.baseUrl}, token loaded`);
   // the bridge's own gateway token has no recognisable shape, so it is
   // removed by its exact value from everything returned to the sandbox
   registerSecretValue(gatewayConfig.token);

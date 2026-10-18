@@ -29,7 +29,8 @@ Register of all tests, sorted by the [FEATURES.md](FEATURES.md) number each test
 - **F11** `src/cron.test.ts` › gateway-rpc challenge/connect/request flow with protocols 3 to 4, timeout, auth failure, non-ok response, malformed frame, transport error, connection closed before connect.
 - **F12** `src/disabled-tools.test.ts` › comma and whitespace separation, empty entries ignored, disabled tools hidden, exact names only.
 - **F12** `src/server.test.ts` › disabled tools refused with a clear error.
-- **F13** `src/commands.test.ts` › loadGatewayConfig reads URL and token, defaults the URL to http://openclaw:18789.- **F13** `src/cron.test.ts` › gateway-rpc url converts http to ws and https to wss.
+- **F13** `src/commands.test.ts` › loadGatewayConfig reads URL and token, defaults the URL to http://openclaw:18789.
+- **F13** `src/cron.test.ts` › gateway-rpc url converts http to ws and https to wss.
 
 ## End-to-end
 
@@ -49,6 +50,9 @@ Register of all tests, sorted by the [FEATURES.md](FEATURES.md) number each test
 
 - **F16** `tests/image-contract.sh` › skill_shipped — `/app/skills/openclaw-mcp-gateway/SKILL.md` in the image equals `SKILL.md`.
 - **F14** `tests/image-contract.sh` › no sh, no bash, no busybox, no perl — the image is headless.
+- **F17** `tests/image-contract.sh` › healthy_while_gateway_unreachable, logs_unreachable_gateway — the image started without a network and with a gateway address nobody serves turns healthy from its own `HEALTHCHECK`, the health output says «not reachable», and the log names the address and «not reachable» (regression: the shell form needed `/bin/sh`, which the image does not carry, and the Swarm task stayed in «Starting»).
+- **F17** `src/server.test.ts` › healthReport is ready when the gateway answers, waits and names the reason when it does not, and counts any HTTP answer as reachable.
+- **F17** `test/docker-compose.yml` — the test client waits for the HEALTHCHECK of the image; the compose file sets none of its own.
 
 ## Workflow contract
 

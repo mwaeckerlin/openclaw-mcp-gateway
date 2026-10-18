@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
-import { runAllowedToolWithArguments } from "./server.js";
+import { healthReport, runAllowedToolWithArguments } from "./server.js";
 import { __testing as rpcTesting } from "./gateway-rpc.js";
 
 const TEST_CONFIG = {
@@ -76,6 +76,41 @@ function makeResponse(status: number, body: string, contentType = "text/plain"):
 function makeJsonResponse(status: number, body: unknown): Response {
   return makeResponse(status, JSON.stringify(body), "application/json; charset=utf-8");
 }
+
+// ---------------------------------------------------------- health report
+
+test("healthReport is ready when the OpenClaw gateway answers its /healthz", async () => {
+  const asked: string[] = [];
+  await withFetch(async (input) => {
+    asked.push(String(input));
+    return makeJsonResponse(200, { ok: true });
+  }, async () => {
+    const report = await healthReport(TEST_CONFIG);
+    assert.equal(report.status, "ready");
+    assert.equal(report.gateway.reachable, true);
+    assert.equal(report.gateway.detail, "HTTP 200");
+  });
+  assert.deepEqual(asked, ["http://gateway.example.invalid/healthz"]);
+});
+
+test("healthReport waits for the gateway and names why it is not reachable", async () => {
+  await withFetch(async () => {
+    throw new TypeError("fetch failed", { cause: Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }) });
+  }, async () => {
+    const report = await healthReport(TEST_CONFIG);
+    assert.equal(report.status, "waiting for gateway");
+    assert.equal(report.gateway.reachable, false);
+    assert.match(report.gateway.detail, /not reachable: ECONNREFUSED/);
+  });
+});
+
+test("healthReport counts any HTTP answer of the gateway as reachable", async () => {
+  await withFetch(async () => makeResponse(503, "starting"), async () => {
+    const report = await healthReport(TEST_CONFIG);
+    assert.equal(report.gateway.reachable, true);
+    assert.equal(report.gateway.detail, "HTTP 503");
+  });
+});
 
 // ---------------------------------------------------------- HTTP tool tests
 

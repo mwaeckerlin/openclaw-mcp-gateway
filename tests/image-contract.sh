@@ -59,6 +59,34 @@ for image in "$@"; do
     else
         _fail "${image}_skill_shipped" "/app/skills/openclaw-mcp-gateway/SKILL.md missing or different from SKILL.md"
     fi
+    # the image's own HEALTHCHECK turns the container healthy while the
+    # OpenClaw gateway is not reachable, says so in the health output and in
+    # the log, and runs without a shell, because the image has none
+    # (regression: the shell form `CMD node -e …` never ran, Swarm kept the
+    # task in «Starting», and the log said nothing about the gateway)
+    NAME="openclaw-mcp-gateway-health-$$"
+    docker run -d --name "${NAME}" --pull=never --network none --health-interval=2s \
+        -e OPENCLAW_GATEWAY_TOKEN=image-contract-token-$$ -e OPENCLAW_GATEWAY_URL=http://127.0.0.1:9 \
+        -e OPENCLAW_DEVICE_FILE=/tmp/device.json "${image}" > /dev/null
+    STATE=""
+    for _ in $(seq 1 30); do
+        STATE=$(docker inspect --format '{{.State.Health.Status}}' "${NAME}" 2>/dev/null)
+        [[ "${STATE}" == "healthy" ]] && break
+        sleep 1
+    done
+    HEALTH_OUTPUT=$(docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' "${NAME}" 2>&1)
+    LOG=$(docker logs "${NAME}" 2>&1)
+    if [[ "${STATE}" == "healthy" && "${HEALTH_OUTPUT}" == *"not reachable"* ]]; then
+        _pass "${image}_healthy_while_gateway_unreachable"
+    else
+        _fail "${image}_healthy_while_gateway_unreachable" "health «${STATE}»: $(tail -n 3 <<< "${HEALTH_OUTPUT}")"
+    fi
+    if [[ "${LOG}" == *"http://127.0.0.1:9"*"not reachable"* ]]; then
+        _pass "${image}_logs_unreachable_gateway"
+    else
+        _fail "${image}_logs_unreachable_gateway" "log: $(tail -n 5 <<< "${LOG}")"
+    fi
+    docker rm -f "${NAME}" > /dev/null 2>&1
 done
 
 echo ""

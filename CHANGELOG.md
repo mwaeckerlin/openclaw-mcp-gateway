@@ -1,5 +1,10 @@
 # Changelog
 
+- 2026-10-18 **1.1.5**
+    - The container turns healthy in Docker Swarm: the image's health check needed a shell, which the image does not carry, so the task stayed in «Starting»; it now runs without one
+    - `/healthz` says whether the OpenClaw gateway behind the bridge answers: `ready`, or `waiting for gateway` with the reason, such as `not reachable: ECONNREFUSED`; the health check shows that answer, and a bridge that does not answer at all is unhealthy
+    - The log names the start, the gateway address and every change of the gateway's reachability
+
 - 2026-10-15 **1.1.4**
     - The gateway token is read from the Docker secret `openclaw_gateway_token` again: the server looked for it at `/run/secret/openclaw_gateway_token`, while Docker mounts secrets under `/run/secrets/`, so in Docker Swarm it found no token and stopped at the start; a secret mounted at `/run/secret/openclaw_gateway_token`, as the README described before, is still read
     - The start error without a token names the Docker secret path beside the variables
